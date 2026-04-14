@@ -1,0 +1,8 @@
+{
+  "name": "agent-discovery",
+  "version": "0.1.0",
+  "description": "Discover and apply AI agent configurations from curated catalogs",
+  "author": {
+    "name": "Nikhil Sivapuram"
+  }
+}

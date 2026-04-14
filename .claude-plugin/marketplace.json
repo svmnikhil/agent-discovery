@@ -1,0 +1,18 @@
+{
+  "name": "nikhil-plugins",
+  "owner": {
+    "name": "Nikhil Sivapuram"
+  },
+  "plugins": [
+    {
+      "name": "agent-discovery",
+      "source": "./plugins/agent-discovery",
+      "description": "Discover and apply AI agent configurations from curated catalogs like awesome-copilot",
+      "version": "0.1.0",
+      "author": {
+        "name": "Nikhil Sivapuram"
+      },
+      "skills": ["recommend", "apply"]
+    }
+  ]
+}

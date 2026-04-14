@@ -1,0 +1,19 @@
+{
+  "name": "agent-discovery",
+  "version": "1.0.0",
+  "description": "MCP server for discovering and installing GitHub Copilot agents from the awesome-copilot catalog",
+  "type": "module",
+  "main": "dist/mcp-server.js",
+  "scripts": {
+    "build": "tsc",
+    "dev": "tsc --watch"
+  },
+  "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "zod": "^3.24.2"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  }
+}
