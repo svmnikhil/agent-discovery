@@ -396,11 +396,7 @@ server.tool(
             const entries = cluster.entries
               .map((e) => `${e.name} (${e.source})`)
               .join(", ");
-            let scoreLine = "";
-            if (cluster.scores) {
-              scoreLine = ` [desc=${cluster.scores.descriptionJaccard} name=${cluster.scores.nameOverlap} combined=${cluster.scores.combined}]`;
-            }
-            text += `\n  - "${cluster.label}": ${entries}${scoreLine}`;
+            text += `\n  - "${cluster.label}": ${entries}`;
           }
         } else {
           text += `\n\nNo duplicate clusters found across sources.`;
