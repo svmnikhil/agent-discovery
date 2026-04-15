@@ -12,7 +12,7 @@
 import fs from "node:fs";
 import path from "node:path";
 import initSqlJs, { type Database } from "sql.js";
-import type { CatalogEntry, CatalogMeta, SearchResult } from "./types.js";
+import type { CatalogEntry, CatalogMeta, SearchResult, DuplicateCluster } from "./types.js";
 
 let db: Database | null = null;
 
@@ -375,9 +375,7 @@ export async function getCatalogInfo(): Promise<
  * Get duplicate clusters across sources — entries from different sources
  * that are semantically similar (same concept, different wording).
  */
-export async function getDuplicateClusters(): Promise<
-  Array<{ label: string; entries: Array<{ name: string; source: string }> }>
-> {
+export async function getDuplicateClusters(): Promise<DuplicateCluster[]> {
   const entries = await getAllEntries();
 
   // Group by source
@@ -390,7 +388,7 @@ export async function getDuplicateClusters(): Promise<
   const sources = Object.keys(bySource);
   // Track which entries are already in a cluster (one cluster per entry, no transitive merging)
   const used = new Set<string>();
-  const clusters: Array<{ label: string; entries: Array<{ name: string; source: string }> }> = [];
+  const clusters: DuplicateCluster[] = [];
 
   // Compare across all source pairs
   for (let si = 0; si < sources.length; si++) {
@@ -446,6 +444,11 @@ export async function getDuplicateClusters(): Promise<
               { name: a.name, source: a.source },
               { name: b.name, source: b.source },
             ],
+            scores: {
+              descriptionJaccard: Math.round(descSim * 1000) / 1000,
+              nameOverlap: Math.round(nameOverlap * 1000) / 1000,
+              combined: Math.round(combined * 1000) / 1000,
+            },
           });
           break; // Move to next `a` since this one is used
         }

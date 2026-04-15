@@ -64,3 +64,13 @@ export interface SearchResult {
   cluster?: string;
   alternatives?: Array<{ source: string; name: string }>;
 }
+
+export interface DuplicateCluster {
+  label: string;
+  entries: Array<{ name: string; source: string }>;
+  scores?: {
+    descriptionJaccard: number;
+    nameOverlap: number;
+    combined: number;
+  };
+}
