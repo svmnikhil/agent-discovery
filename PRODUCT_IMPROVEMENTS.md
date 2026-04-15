@@ -1,80 +1,50 @@
 # Product Improvements Analysis
 
-## Phase 2 & 3 Test Results Summary
+## v2.0 Architecture — Resolved Items
 
-### Current Functionality Working ✅
+The following gaps from v1.0 have been addressed by the v2.0 pre-built SQLite catalog refactor:
 
-1. **MCP Tools (5 total)**
-   - `fetch_catalog` - Fetches 640 entries from awesome-copilot ✅
-   - `search_agents` - Searches with type filter (agent/skill/instruction) ✅
-   - `get_agent_details` - Returns full agent content ✅
-   - `download_agent` - Downloads to `.github/agents/` ✅
-   - `validate_agent` - Validates agent file structure ✅
+### ✅ Resolved: No Auth Required
+**Was:** Users needed GitHub API access for some sources.
+**Now:** Catalog is bundled at publish time. Zero auth, zero setup. Content fetched from raw.githubusercontent.com (no auth needed).
 
-2. **Catalog Types Discovered**
-   - **Agents** (188): Full agent definitions with tools, expertise, guidelines
-   - **Instructions** (175): Project-level instructions (like coding standards)
-   - **Skills** (277): Reusable skill definitions (like autoresearch)
+### ✅ Resolved: Skills Download Supported
+**Was:** `download_agent` only worked for agents, not skills or instructions (277 skills inaccessible).
+**Now:** `download_agent` routes by type: agents → `.claude/agents/`, instructions → `.github/instructions/`, skills → `.claude/skills/`.
 
-### Key Gaps & Product Improvements Needed
+### ✅ Resolved: Multi-Source Catalog
+**Was:** Single source (awesome-copilot llms.txt) hardcoded.
+**Now:** Source adapters with `sources.json` config. Currently: awesome-copilot (676 entries) + gh-aw (11 entries). Adding new sources = config change, not code change.
 
-#### 🔴 Critical Gap: No Instructions for Using Installed Agents
+### ✅ Resolved: Cross-Source Dedup
+**Was:** No dedup — identical agents from different sources would appear as separate results.
+**Now:** Jaccard similarity + name overlap clustering. Similar entries across sources show "⚡ Also available from:" with alternatives.
 
-**Problem:** After downloading an agent, developers don't know how to activate it.
+### ✅ Resolved: Search Quality
+**Was:** Naive keyword scan over JSON.
+**Now:** BM25-style scoring with weighted name/tag/description/tool matching + prefix matching.
 
-**Current behavior:**
-```
-$ /agent-discovery:apply "Expert React Frontend Engineer"
-✅ Agent downloaded to .github/agents/expert-react-frontend-engineer.agent.md
-```
+### ✅ Resolved: Activation Guidance
+**Was:** After download, users didn't know how to activate agents.
+**Now:** `download_agent` returns activation instructions per type (agent/skill/instruction).
 
-**What's missing:** The user has no idea what to do next. The agent file is downloaded but there's no:
-1. Activation instructions
-2. Usage examples
-3. Information about what the agent will do when invoked
+---
+
+## Remaining Gaps & Product Improvements
+
+#### 🔴 Critical: No End-to-End Test in Claude Code
+**Problem:** The MCP server hasn't been tested as an actual plugin in Claude Code. We know the tools compile and work via direct Node calls, but haven't verified they appear and work through the MCP protocol.
 
 **Improvement:**
-```
-$ /agent-discovery:apply "Expert React Frontend Engineer"
-✅ Agent installed to .github/agents/expert-react-frontend-engineer.agent.md
-
-📖 What happens next:
-   When you work in this repo, Claude Code will automatically use this agent
-   when you ask about React, hooks, components, or frontend development.
-
-   Try it:
-   • "Help me build a form with React 19 Actions"
-   • "Review my React component for performance"
-
-   Agent includes: TypeScript, testing, accessibility, modern hooks expertise
-```
+1. Install the plugin in a test Claude Code project
+2. Verify all 5 tools appear in `/agent-discovery:` namespace
+3. Test search_agents, recommend, download_agent flows
+4. Test with both awesome-copilot and gh-aw agents
 
 ---
 
-#### 🔴 Critical Gap: Skills Download Not Supported
-
-**Problem:** `download_agent` only works for agents, not skills or instructions.
-
-**Current behavior:**
-```
-$ download_agent("Autoresearch")
-❌ "Autoresearch" is a skill, not an agent. download_agent is for agents only.
-```
-
-**Impact:** 277 skills in catalog are inaccessible!
-
-**Improvement:** Rename tool to `download_item` or `install_item` with type parameter:
-```
-download_item(name: string, type: "agent" | "skill" | "instruction", targetDir: string)
-```
-
-For skills, they should go to `.github/skills/` (not `.github/agents/`).
-
----
-
-#### 🟡 Medium Gap: No List Installed Items
-
-**Problem:** No way to see what agents/skills are already installed.
+#### 🟡 Medium: No List Installed Items
+**Problem:** No way to see what agents/skills are already installed in a project.
 
 **Improvement:** Add `list_installed` tool:
 ```
@@ -83,170 +53,105 @@ list_installed(targetDir: string, type?: "agent" | "skill" | "instruction")
 
 Returns:
 ```
-Installed in .github/agents/:
-  • Expert React Frontend Engineer (24.9 KB)
-  • TypeScript Expert (15.2 KB)
-
-Installed in .github/skills/:
-  • Autoresearch (8.1 KB)
+Installed in .claude/agents/:
+  • Grumpy Reviewer (from: gh-aw)
+  • Expert React Frontend Engineer (from: awesome-copilot)
 ```
 
 ---
 
-#### 🟡 Medium Gap: Search Results Don't Show Type Clearly
+#### 🟡 Medium: No Remove/Uninstall
+**Problem:** No way to remove an installed agent through the plugin.
 
-**Problem:** Search results show `[agent]` or `[skill]` but don't explain what each type means.
-
-**Improvement:** Add type descriptions in search output:
+**Improvement:** Add `uninstall_agent` tool:
 ```
-Found 3 result(s) for "react":
-
-1. **Expert React Frontend Engineer** [agent]
-   ⚡ Agent - Full AI assistant persona with tools and expertise
-   Expert React 19.2 frontend engineer...
-
-2. **Msstore Cli** [skill]
-   🔧 Skill - Reusable capability for specific tasks
-   Microsoft Store Developer CLI...
-
-3. **Agent Skills** [instruction]
-   📋 Instruction - Project-level coding guidelines
-   Guidelines for creating high-quality Agent Skills...
+uninstall_agent(name: string, targetDir: string)
 ```
 
 ---
 
-#### 🟢 Low Gap: No Overwrite Option in download_agent
+#### 🟡 Medium: catalog_info --stats Shows Duplicate Clusters
+**Problem:** Users can't see which agents overlap across sources without searching.
 
-**Problem:** If file exists, download fails with error.
-
-**Current behavior:**
+**Improvement:** Add `--stats` flag to catalog_info that pre-computes duplicate clusters:
 ```
-❌ Agent file already exists. Use overwrite: true to replace it.
-```
+Catalog: 687 entries from 2 sources
+  awesome-copilot: 676 (203 agents, 177 instructions, 296 skills)
+  gh-aw: 11 (9 agents, 2 instructions)
 
-**Issue:** The tool mentions `overwrite: true` but this isn't exposed via the skill interface.
-
-**Improvement:** The `/agent-discovery:apply` skill should ask user if they want to overwrite:
-```
-Agent "Expert React Frontend Engineer" is already installed.
-Overwrite? (yes/no)
+Potential duplicates: 3 clusters
+  - "ADR" (2 variants: awesome-copilot, gh-aw)
+  - "technical writing" (3 variants)
+  - "reviewer" (2 variants)
 ```
 
 ---
 
-#### 🟢 Low Gap: No Preview Before Download
+#### 🟢 Low: Overwrite Prompt in apply Skill
+**Problem:** If a file already exists, download fails. The skill should ask the user first.
 
-**Problem:** Users download agents blind without knowing the full scope.
-
-**Improvement:** `/agent-discovery:recommend` should show a preview option:
-```
-Recommended agents for your React Native project:
-
-1. **Expert React Frontend Engineer**
-   Tools: 22 available
-   Expertise: React 19.2, TypeScript, testing, accessibility
-   Size: 24.9 KB
-
-   [Preview details?] [Install now?]
-```
+**Current:** Error message mentions `overwrite: true`.
+**Improvement:** The `/agent-discovery:apply` skill should ask: "Agent already installed. Overwrite?"
 
 ---
 
-## Recommended Product Roadmap
+#### 🟢 Low: Preview Before Download
+**Problem:** Users download agents without seeing the full content first.
 
-### Phase 1: Activation Guidance (Critical) ✨
-1. Update `download_agent` tool output to include activation instructions
-2. Update `/agent-discovery:apply` skill to show "What happens next" section
-3. Add example prompts that would trigger the agent
-
-### Phase 2: Support All Catalog Types
-1. Add `download_skill` and `download_instruction` tools
-2. Or: Create unified `install_item` tool with type parameter
-3. Update `/agent-discovery:apply` to handle all three types
-
-### Phase 3: Management Features
-1. Add `list_installed` tool
-2. Add `remove_item` tool
-3. Add `update_item` tool (re-download from source)
-
-### Phase 4: Enhanced Discovery
-1. Add "Preview" option before install
-2. Add "Similar agents" suggestions
-3. Add "Popular in your tech stack" recommendations
+**Improvement:** `/agent-discovery:apply` should show a preview option using `get_agent_details` before calling `download_agent`.
 
 ---
 
-## Test Evidence
+## Priority: What Devs Need Most
 
-### Phase 2 Results
-```json
-// search_agents for "typescript"
-{
-  "result": {
-    "content": [{
-      "type": "text",
-      "text": "Found 5 result(s)...\n\n1. **Apify Integration Expert** [agent]\n2. **Expert Nuxt Developer** [agent]\n3. **Expert React Frontend Engineer** [agent]\n4. **Expert Vue.js Frontend Engineer** [agent]\n5. **GitHub Actions Node Runtime Upgrade** [agent]"
-    }]
-  }
-}
+1. **"Does this actually work in Claude Code?"** — E2E test is the #1 blocker
+2. **"What do I have installed?"** — list_installed tool
+3. **"How do I remove an agent?"** — uninstall_agent tool
+
+## Priority: What Devs DON'T Need Yet
+
+- Overwrite prompt (low friction, can manually delete)
+- Preview before download (can use get_agent_details first)
+- Semantic embeddings (overkill at this scale)
+
+---
+
+## Test Evidence (v2.0)
+
+### Build
+```
+$ npm run build-catalog
+Building catalog...
+Found 2 enabled source(s)
+Fetching from awesome-copilot (llms-txt)...
+  → 676 entries
+Fetching from gh-aw (github-directory)...
+  → 11 entries
+Total entries: 687
+Catalog written to catalog/catalog.db (248.0 KB)
 ```
 
-### Phase 3 Results
-```json
-// download_agent - already exists error
-{
-  "result": {
-    "content": [{
-      "type": "text",
-      "text": "Agent file already exists... Use overwrite: true to replace it."
-    }],
-    "isError": true
-  }
-}
-
-// download_agent for skill - type error
-{
-  "result": {
-    "content": [{
-      "type": "text",
-      "text": "\"Autoresearch\" is a skill, not an agent. download_agent is for agents only."
-    }],
-    "isError": true
-  }
-}
+### Search
 ```
+$ search_agents("ADR", "all", 10)
+1. Adr Writer (gh-aw)
+   ⚡ Also available from: ADR Generator (awesome-copilot)
 
-### Agent Content Structure
-```yaml
----
-description: "Expert React 19.2 frontend engineer..."
-name: "Expert React Frontend Engineer"
-tools: ["changes", "codebase", "edit/editFiles", ...]
----
+$ search_agents("code review", "all", 5)
+1. Gilfoyle Code Review Mode (awesome-copilot)
+2. Electron Code Review Mode Instructions (awesome-copilot)
+3. Code Review Generic (awesome-copilot)
+4. Gilfoyle Code Review (awesome-copilot)
+5. WG Code Alchemist (awesome-copilot)
 
-# Expert React Frontend Engineer
-
-You are a world-class expert in React 19.2...
-
-## Your Expertise
-- React 19.2 Features
-- React 19 Core Features
-- Server Components
-...
+$ search_agents("azure deploy", "all", 5)
+1. Azure Iac Exporter (awesome-copilot)
+2. Azure AVM Bicep mode (awesome-copilot)
+3. Azure AVM Terraform mode (awesome-copilot)
+4. Azure Principal Architect mode (awesome-copilot)
+5. Azure SaaS Architect mode (awesome-copilot)
 ```
 
 ---
 
-## Priority: What devs need MOST
-
-**Top 3:**
-
-1. **"How do I use this agent?"** - Activation guidance after install
-2. **"What skills are available?"** - Support downloading skills, not just agents
-3. **"What do I have installed?"** - List installed items
-
-**What devs DON'T need yet:**
-- Overwrite prompt (low friction)
-- Preview before download (can preview in discovery phase)
-- Update/remove tools (can manually manage files for now)
+*Updated: 2026-04-14 | Version: 2.0.0 | Plugin: agent-discovery*

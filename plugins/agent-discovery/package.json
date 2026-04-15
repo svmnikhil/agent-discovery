@@ -1,19 +1,27 @@
 {
   "name": "agent-discovery",
-  "version": "1.0.0",
-  "description": "MCP server for discovering and installing GitHub Copilot agents from the awesome-copilot catalog",
+  "version": "2.0.0",
+  "description": "MCP server for discovering and installing AI agents from curated catalogs (pre-built SQLite + FTS5)",
   "type": "module",
   "main": "dist/mcp-server.js",
   "scripts": {
     "build": "tsc",
-    "dev": "tsc --watch"
+    "dev": "tsc --watch",
+    "build-catalog": "npx tsx scripts/build-catalog.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "sql.js": "^1.14.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "tsx": "^4.21.0",
     "typescript": "^5.7.0"
-  }
+  },
+  "files": [
+    "dist/",
+    "catalog/",
+    "sources.json"
+  ]
 }

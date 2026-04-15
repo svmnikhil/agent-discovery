@@ -3,18 +3,24 @@
  */
 
 export interface CatalogEntry {
+  /** Unique ID: "{source}:{filename}" */
+  id: string;
+  /** Source identifier (e.g. "awesome-copilot", "gh-aw") */
+  source: string;
   name: string;
   type: "agent" | "instruction" | "skill";
-  url: string;
   description: string;
-  /** File name derived from the URL (e.g. "dotnet-upgrade.agent.md") */
+  /** raw.githubusercontent.com URL (always latest) */
+  url: string;
+  /** File name derived from the URL */
   fileName: string;
-}
-
-export interface Catalog {
+  /** Tool names from frontmatter */
+  tools?: string[];
+  /** Tags from frontmatter */
+  tags?: string[];
   fetchedAt: string;
-  source: string;
-  entries: CatalogEntry[];
+  /** Populated by dedup — similar agents from other sources */
+  _alternatives?: Array<{ source: string; name: string }>;
 }
 
 export interface AgentDetails {
@@ -26,8 +32,35 @@ export interface AgentDetails {
   content: string;
 }
 
-export interface ValidationResult {
-  valid: boolean;
-  errors: string[];
-  warnings: string[];
+export interface SourceConfig {
+  id: string;
+  type: "llms-txt" | "github-directory";
+  url?: string;
+  repo?: string;
+  path?: string;
+  branch?: string;
+  enabled: boolean;
+}
+
+export interface SourcesFile {
+  sources: SourceConfig[];
+}
+
+export interface SourceAdapter {
+  id: string;
+  fetch(): Promise<CatalogEntry[]>;
+}
+
+export interface CatalogMeta {
+  version: string;
+  built_at: string;
+  source_count: number;
+  entry_count: number;
+}
+
+export interface SearchResult {
+  entry: CatalogEntry;
+  score: number;
+  cluster?: string;
+  alternatives?: Array<{ source: string; name: string }>;
 }

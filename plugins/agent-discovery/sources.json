@@ -1,0 +1,18 @@
+{
+  "sources": [
+    {
+      "id": "awesome-copilot",
+      "type": "llms-txt",
+      "url": "https://awesome-copilot.github.com/llms.txt",
+      "enabled": true
+    },
+    {
+      "id": "gh-aw",
+      "type": "github-directory",
+      "repo": "github/gh-aw",
+      "path": ".github/agents",
+      "branch": "main",
+      "enabled": true
+    }
+  ]
+}
