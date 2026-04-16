@@ -1,7 +1,7 @@
 {
   "name": "agent-discovery",
-  "version": "0.1.0",
-  "description": "Discover and apply AI agent configurations from curated catalogs",
+  "version": "0.2.0",
+  "description": "Discover and apply AI agent configurations from curated catalogs with interactive review and team assembly",
   "author": {
     "name": "Nikhil Sivapuram",
     "url": "https://github.com/svmnikhil"
@@ -14,7 +14,9 @@
     "agents",
     "discovery",
     "awesome-copilot",
-    "catalog"
+    "catalog",
+    "team",
+    "interactive"
   ],
   "skills": "./skills/"
 }
