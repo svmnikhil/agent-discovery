@@ -1,6 +1,7 @@
 ---
 name: apply
 description: Apply an AI agent, instruction, or skill configuration to the current workspace
+user-invocable: true
 ---
 
 # apply

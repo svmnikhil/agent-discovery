@@ -1,6 +1,7 @@
 ---
 name: recommend
 description: Recommend AI agent configurations based on the current workspace context
+user-invocable: true
 ---
 
 # recommend

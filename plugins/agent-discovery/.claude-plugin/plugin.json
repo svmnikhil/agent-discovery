@@ -3,6 +3,18 @@
   "version": "0.1.0",
   "description": "Discover and apply AI agent configurations from curated catalogs",
   "author": {
-    "name": "Nikhil Sivapuram"
-  }
+    "name": "Nikhil Sivapuram",
+    "url": "https://github.com/svmnikhil"
+  },
+  "homepage": "https://github.com/svmnikhil/claude-agent-discovery#readme",
+  "repository": "https://github.com/svmnikhil/claude-agent-discovery",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "agents",
+    "discovery",
+    "awesome-copilot",
+    "catalog"
+  ],
+  "skills": "./skills/"
 }
