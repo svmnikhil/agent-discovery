@@ -588,8 +588,8 @@ Create your own marketplace for distribution:
       "description": "Discover and apply AI agent configurations from curated catalogs",
       "version": "0.2.0",
       "author": { "name": "Nikhil Sivapuram" },
-      "homepage": "https://github.com/svmnikhil/claude-agent-discovery#readme",
-      "repository": "https://github.com/svmnikhil/claude-agent-discovery",
+      "homepage": "https://github.com/svmnikhil/agent-discovery#readme",
+      "repository": "https://github.com/svmnikhil/agent-discovery",
       "license": "MIT",
       "keywords": ["mcp", "agents", "discovery", "awesome-copilot"],
       "category": "developer-tools"
@@ -600,7 +600,7 @@ Create your own marketplace for distribution:
 
 2. **Push to GitHub** — users add your marketplace with:
    ```
-   /plugin marketplace add svmnikhil/claude-agent-discovery
+   /plugin marketplace add svmnikhil/agent-discovery
    ```
 
 3. **Users install with:**

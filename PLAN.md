@@ -173,4 +173,4 @@ node dist/mcp-server.js  # starts MCP server on stdio
 
 ---
 
-*Version: 2.0.0 | Plugin: agent-discovery | Repo: https://github.com/svmnikhil/claude-agent-discovery*
+*Version: 2.0.0 | Plugin: agent-discovery | Repo: https://github.com/svmnikhil/agent-discovery*

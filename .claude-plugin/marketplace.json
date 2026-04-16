@@ -11,8 +11,8 @@
       "description": "Discover and apply AI agent configurations from curated catalogs with interactive review and team assembly",
       "version": "0.2.0",
       "author": { "name": "Nikhil Sivapuram", "url": "https://github.com/svmnikhil" },
-      "homepage": "https://github.com/svmnikhil/claude-agent-discovery#readme",
-      "repository": "https://github.com/svmnikhil/claude-agent-discovery",
+      "homepage": "https://github.com/svmnikhil/agent-discovery#readme",
+      "repository": "https://github.com/svmnikhil/agent-discovery",
       "license": "MIT",
       "keywords": ["mcp", "agents", "discovery", "awesome-copilot", "catalog", "team"],
       "category": "developer-tools"

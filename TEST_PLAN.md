@@ -13,7 +13,7 @@ This document outlines the testing strategy for the `agent-discovery` Claude Cod
 ## Prerequisites
 
 - Claude Code CLI installed and authenticated
-- Plugin built and available at `~/Documents/GitHub/claude-agent-discovery/`
+- Plugin built and available at `~/Documents/GitHub/agent-discovery/`
 - Test repo cloned: `~/Documents/GitHub/career-tinder`
 
 ---
@@ -27,7 +27,7 @@ This document outlines the testing strategy for the `agent-discovery` Claude Cod
 **Steps:**
 ```bash
 cd ~/Documents/GitHub/career-tinder
-claude --plugin-dir ~/Documents/GitHub/claude-agent-discovery/plugins/agent-discovery
+claude --plugin-dir ~/Documents/GitHub/agent-discovery
 ```
 
 **In Claude Code:**
@@ -190,7 +190,7 @@ claude
 
 **In Claude Code:**
 ```
-/plugin marketplace add ~/Documents/GitHub/claude-agent-discovery
+/plugin marketplace add ~/Documents/GitHub/agent-discovery
 /plugin install agent-discovery@nikhil-plugins
 ```
 

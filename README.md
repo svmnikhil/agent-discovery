@@ -2,7 +2,7 @@
 
 **Discover, browse, and install AI agents from curated catalogs.**
 
-[![npm](https://img.shields.io/badge/npm-v2.0.0-blue)](https://www.npmjs.com/package/agent-discovery) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/svmnikhil/claude-agent-discovery?style=flat&color=yellow)](https://github.com/svmnikhil/claude-agent-discovery/stargazers)
+[![npm](https://img.shields.io/badge/npm-v2.0.0-blue)](https://www.npmjs.com/package/agent-discovery) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/svmnikhil/agent-discovery?style=flat&color=yellow)](https://github.com/svmnikhil/agent-discovery/stargazers)
 
 ## The Problem
 
@@ -23,8 +23,8 @@ Agent Discovery solves this with:
 **Install:**
 
 ```bash
-/plugin marketplace add svmnikhil/claude-agent-discovery
-/plugin install agent-discovery@claude-agent-discovery
+/plugin marketplace add svmnikhil/agent-discovery
+/plugin install agent-discovery
 ```
 
 Restart Claude Code (or run `/reload-plugins`).
@@ -41,8 +41,8 @@ Should respond with recommendations based on your project context.
 <summary>Alternative — Local development install</summary>
 
 ```bash
-git clone https://github.com/svmnikhil/claude-agent-discovery.git
-cd claude-agent-discovery
+git clone https://github.com/svmnikhil/agent-discovery.git
+cd agent-discovery
 npm run build
 claude --plugin-dir .
 ```
@@ -94,7 +94,7 @@ Items are installed to the correct directory automatically:
 ## Architecture
 
 ```
-claude-agent-discovery/
+agent-discovery/
 ├── .claude-plugin/
 │   ├── plugin.json              # Plugin manifest
 │   └── marketplace.json         # Marketplace listing
