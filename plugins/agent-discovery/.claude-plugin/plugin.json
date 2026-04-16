@@ -18,5 +18,5 @@
     "team",
     "interactive"
   ],
-  "skills": "../skills/"
+  "skills": "./skills/"
 }
