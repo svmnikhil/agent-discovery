@@ -31,12 +31,94 @@ No setup required — catalog is bundled with the plugin.
 
 ## How It Works
 
-1. Analyze workspace context (files, tech stack, existing configs)
-2. Call MCP tool `recommend` with query + context to get candidates
-3. Review the candidates and rank them based on the user's specific needs
-4. Present top 5 recommendations with explanations of *why* each fits
-5. **Automatically launch AskUserQuestion for interactive next steps**
-6. Guide user through Review → Install → Team Assembly flow based on their choice
+1. **Check if agent teams are enabled** — look for `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` environment variable
+2. **If teams not enabled** — use AskUserQuestion to offer enabling before continuing
+3. Analyze workspace context (files, tech stack, existing configs)
+4. Call MCP tool `recommend` with query + context to get candidates
+5. Review the candidates and rank them based on the user's specific needs
+6. Present top 5 recommendations with explanations of *why* each fits
+7. **Automatically launch AskUserQuestion for interactive next steps**
+8. Guide user through Review → Install → Team Assembly flow based on their choice
+
+## 🔍 Pre-Flight Teams Check (OPTIONAL but RECOMMENDED)
+
+**At the start of the /recommend command**, check if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set to `1`.
+
+This check is **best-effort** — the skill can't directly read env vars, but Claude's context will show if teams features are available. Look for:
+- Any mention of agent teams in the context
+- Whether TeamCreate tool is available in the tool list
+
+### If teams appear to be disabled:
+
+Use AskUserQuestion **before** running the main recommendation:
+
+```json
+{
+  "questions": [{
+    "question": "Agent teams are currently disabled. Enable experimental teams for the best experience?",
+    "header": "Teams",
+    "multiSelect": false,
+    "options": [
+      {
+        "label": "Yes, enable teams",
+        "description": "Show me how to enable CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS for team assembly"
+      },
+      {
+        "label": "No, continue without teams",
+        "description": "Run recommendation without team features (agents work as subagents)"
+      }
+    ]
+  }]
+}
+```
+
+#### If "Yes, enable teams":
+
+Provide instructions and **pause the flow**:
+
+```
+🔧 Enable Agent Teams
+
+To use team assembly features, add this to your Claude Code settings:
+
+1. Open settings: Claude Code → Settings → Open Settings File
+2. Add to the JSON:
+   {
+     "env": {
+       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+     }
+   }
+3. Restart Claude Code
+4. Re-run /recommend
+
+You can also set it in your shell:
+   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+
+Once enabled, you'll be able to:
+- Assemble agents into coordinated teams
+- Create teams programmatically with TeamCreate
+- Have teammates work in parallel on different aspects
+
+Run /recommend again after enabling.
+```
+
+**Do not proceed with recommendation until user confirms they've enabled it or chosen to continue without.**
+
+#### If "No, continue without teams":
+
+Proceed with recommendation, but **note in the post-recommendation AskUserQuestion**:
+- Change "Assemble a team" option to:
+  ```json
+  {
+    "label": "Assemble a team (disabled)",
+    "description": "Requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1. Install as subagents instead?"
+  }
+  ```
+- If selected, offer to install agents as subagents
+
+### If teams are already enabled (or user chose to skip check):
+
+Proceed directly to recommendation + post-recommendation AskUserQuestion with full "Assemble a team" option enabled.
 
 ## ⚡ Post-Recommendation Interactive Workflow (REQUIRED)
 
@@ -44,7 +126,7 @@ No setup required — catalog is bundled with the plugin.
 
 ### Step 1: Main Action Picker
 
-Use AskUserQuestion tool with this format:
+**If teams ARE enabled:** Use this format:
 
 ```json
 {
@@ -64,6 +146,36 @@ Use AskUserQuestion tool with this format:
       {
         "label": "Assemble a team",
         "description": "Combine multiple agents into a coordinated team"
+      },
+      {
+        "label": "Done",
+        "description": "End the recommendation flow"
+      }
+    ]
+  }]
+}
+```
+
+**If teams are NOT enabled:** Use this format (team option shows as disabled):
+
+```json
+{
+  "questions": [{
+    "question": "What would you like to do with these recommendations?",
+    "header": "Next step",
+    "multiSelect": false,
+    "options": [
+      {
+        "label": "Review an agent",
+        "description": "Browse and edit agent markdown before installing"
+      },
+      {
+        "label": "Install agents",
+        "description": "Apply selected agents directly to the workspace"
+      },
+      {
+        "label": "Assemble a team (enable first)",
+        "description": "Requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1. Show me how to enable."
       },
       {
         "label": "Done",
@@ -117,7 +229,9 @@ Use AskUserQuestion with multiSelect to pick agents:
 
 Then for each selected agent, call `download_agent` MCP tool.
 
-#### If "Assemble a team":
+#### If "Assemble a team" or "Assemble a team (enable first)":
+
+**If teams are enabled:**
 
 Use AskUserQuestion with multiSelect to pick team members:
 
@@ -136,6 +250,56 @@ Use AskUserQuestion with multiSelect to pick team members:
 ```
 
 Then delegate to `/agent-discovery:team <agent1> <agent2> ...`.
+
+**If teams are NOT enabled:**
+
+Show the enable instructions again:
+
+```
+🔧 Enable Agent Teams
+
+To assemble teams, you need to enable experimental teams:
+
+1. Open Claude Code settings (Cmd/Ctrl + ,)
+2. Add to settings.json:
+   {
+     "env": {
+       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
+     }
+   }
+3. Restart Claude Code
+4. Re-run /recommend
+
+Or set in your shell:
+   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+
+Alternatively, you can install agents individually as subagents:
+- "Install agents" → pick agents → use as subagents
+```
+
+Then use AskUserQuestion:
+
+```json
+{
+  "questions": [{
+    "question": "What would you like to do instead?",
+    "header": "Alternative",
+    "multiSelect": false,
+    "options": [
+      {
+        "label": "Install as subagents",
+        "description": "Install agents individually (works without team mode)"
+      },
+      {
+        "label": "Done for now",
+        "description": "End the flow, I'll enable teams later"
+      }
+    ]
+  }]
+}
+```
+
+If "Install as subagents", proceed with the install flow.
 
 #### If "Done":
 
