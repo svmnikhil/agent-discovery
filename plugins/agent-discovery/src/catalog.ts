@@ -18,9 +18,28 @@ let db: Database | null = null;
 
 /**
  * Get the path to the bundled catalog DB.
+ * Tries multiple locations to handle different runtime contexts.
  */
 function getDbPath(): string {
-  return path.resolve(import.meta.dirname, "..", "catalog", "catalog.db");
+  const candidates = [
+    // Standard location relative to dist/
+    path.resolve(import.meta.dirname, "..", "catalog", "catalog.db"),
+    // If running from source
+    path.resolve(import.meta.dirname, "..", "..", "catalog", "catalog.db"),
+    // Absolute path via env variable (set by Claude Code)
+    process.env.CLAUDE_PLUGIN_ROOT
+      ? path.resolve(process.env.CLAUDE_PLUGIN_ROOT, "catalog", "catalog.db")
+      : null,
+  ].filter((p): p is string => p !== null);
+
+  for (const candidate of candidates) {
+    if (fs.existsSync(candidate)) {
+      return candidate;
+    }
+  }
+
+  // Return first candidate for error message
+  return candidates[0]!;
 }
 
 /**

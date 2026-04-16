@@ -1,7 +1,7 @@
 # Agent Discovery E2E Test Report
 
-Generated: 2026-04-15T01:46:29.452Z
-Network tests: SKIPPED
+Generated: 2026-04-15T19:14:12.549Z
+Network tests: ENABLED
 
 ## Catalog Overview
 
@@ -85,11 +85,16 @@ Source distribution:
 
 ## Agent Details (Network)
 
-SKIPPED (SKIP_NETWORK=1)
+- Tested: 3
+- Successfully fetched: 3
+- With frontmatter: 3
 
 ## Download Agent (Network)
 
-SKIPPED (SKIP_NETWORK=1)
+- Tested: 1
+- Downloaded: 1
+- Overwrite protection: PASS
+- Overwrite allowed: PASS
 
 ## Deduplication Report
 
