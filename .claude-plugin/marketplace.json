@@ -1,18 +1,21 @@
 {
-  "name": "nikhil-plugins",
+  "name": "agent-discovery-marketplace",
   "owner": {
-    "name": "Nikhil Sivapuram"
+    "name": "Nikhil Sivapuram",
+    "url": "https://github.com/svmnikhil"
   },
   "plugins": [
     {
       "name": "agent-discovery",
-      "source": "./plugins/agent-discovery",
-      "description": "Discover and apply AI agent configurations from curated catalogs like awesome-copilot",
-      "version": "0.1.0",
-      "author": {
-        "name": "Nikhil Sivapuram"
-      },
-      "skills": ["recommend", "apply"]
+      "source": ".",
+      "description": "Discover and apply AI agent configurations from curated catalogs with interactive review and team assembly",
+      "version": "0.2.0",
+      "author": { "name": "Nikhil Sivapuram", "url": "https://github.com/svmnikhil" },
+      "homepage": "https://github.com/svmnikhil/claude-agent-discovery#readme",
+      "repository": "https://github.com/svmnikhil/claude-agent-discovery",
+      "license": "MIT",
+      "keywords": ["mcp", "agents", "discovery", "awesome-copilot", "catalog", "team"],
+      "category": "developer-tools"
     }
   ]
 }

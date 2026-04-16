@@ -1,4 +1,6 @@
 node_modules/
-dist/
 .DS_Store
 *.js.map
+
+# Don't ignore dist/ - marketplace needs bundled files
+# dist/
