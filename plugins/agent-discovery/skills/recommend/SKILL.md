@@ -1,12 +1,12 @@
 ---
 name: recommend
-description: Recommend AI agent configurations based on the current workspace context
+description: Discover, review, and install AI agents — or assemble them into a coordinated team
 user-invocable: true
 ---
 
 # recommend
 
-Recommend AI agent configurations based on the current workspace context.
+Single-command interactive workflow to discover, review, install, and assemble AI agents.
 
 ## Usage
 
@@ -14,226 +14,220 @@ Recommend AI agent configurations based on the current workspace context.
 
 ## Description
 
-Analyzes the current workspace (file structure, technologies detected, existing configs) and queries the pre-built agent catalog to recommend relevant agents, instructions, or skills.
+**One command. Full flow.**
+
+1. **Discover** — Analyze workspace and recommend agents from the catalog
+2. **Review** — Browse agent markdown inline, edit in $EDITOR if desired
+3. **Install** — Apply agents directly or with customizations
+4. **Assemble** — Combine agents into a coordinated team with an agentic lead
 
 The catalog includes 687+ entries from multiple sources:
-- **awesome-copilot** — GitHub's community catalog (agents, instructions, skills)
-- **gh-aw** — GitHub's Agent Factory (agents)
+- **awesome-copilot** — GitHub's community catalog
+- **gh-aw** — GitHub's Agent Factory
 
 No setup required — catalog is bundled with the plugin.
 
 ## Examples
 
+```
 /recommend
 /recommend react frontend
-/recommend python data science
-/recommend I need help writing architecture decision records
+/recommend I need help with code reviews
+```
+
+---
 
 ## How It Works
 
-1. **Check if agent teams are enabled** — look for `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` environment variable
-2. **If teams not enabled** — use AskUserQuestion to offer enabling before continuing
-3. Analyze workspace context (files, tech stack, existing configs)
-4. Call MCP tool `recommend` with query + context to get candidates
-5. Review the candidates and rank them based on the user's specific needs
-6. Present top 5 recommendations with explanations of *why* each fits
-7. **Automatically launch AskUserQuestion for interactive next steps**
-8. Guide user through Review → Install → Team Assembly flow based on their choice
+### Phase 0: Pre-Flight Teams Check
 
-## 🔍 Pre-Flight Teams Check (OPTIONAL but RECOMMENDED)
+Check if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is enabled. This is best-effort — look for TeamCreate tool availability or agent teams context.
 
-**At the start of the /recommend command**, check if `CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS` is set to `1`.
-
-This check is **best-effort** — the skill can't directly read env vars, but Claude's context will show if teams features are available. Look for:
-- Any mention of agent teams in the context
-- Whether TeamCreate tool is available in the tool list
-
-### If teams appear to be disabled:
-
-Use AskUserQuestion **before** running the main recommendation:
+**If teams disabled:**
 
 ```json
 {
   "questions": [{
-    "question": "Agent teams are currently disabled. Enable experimental teams for the best experience?",
+    "question": "Agent teams are currently disabled. Enable experimental teams for team assembly?",
     "header": "Teams",
     "multiSelect": false,
     "options": [
-      {
-        "label": "Yes, enable teams",
-        "description": "Show me how to enable CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS for team assembly"
-      },
-      {
-        "label": "No, continue without teams",
-        "description": "Run recommendation without team features (agents work as subagents)"
-      }
+      {"label": "Yes, enable teams", "description": "Show me how to enable CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS"},
+      {"label": "No, continue without", "description": "Agents will work as subagents only"}
     ]
   }]
 }
 ```
 
-#### If "Yes, enable teams":
-
-Provide instructions and **pause the flow**:
+**If "Yes, enable teams":** Show instructions and pause:
 
 ```
 🔧 Enable Agent Teams
 
-To use team assembly features, add this to your Claude Code settings:
+Add to Claude Code settings.json:
+{
+  "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" }
+}
 
-1. Open settings: Claude Code → Settings → Open Settings File
-2. Add to the JSON:
+Then restart Claude Code and re-run /recommend.
+```
+
+**If "No, continue without":** Proceed but disable team assembly option.
+
+---
+
+### Phase 1: Discover
+
+1. Analyze workspace context (files, tech stack, configs)
+2. Call MCP tool `recommend` with query + context
+3. Rank candidates based on user's needs
+4. Present **top 5 recommendations** with explanations
+
+---
+
+### Phase 2: Interactive Action Picker (AUTO-TRIGGERS)
+
+**After presenting recommendations, AskUserQuestion fires automatically:**
+
+**Teams enabled:**
+```json
+{
+  "questions": [{
+    "question": "What would you like to do with these recommendations?",
+    "header": "Next step",
+    "multiSelect": false,
+    "options": [
+      {"label": "Review an agent", "description": "Browse and edit agent markdown before installing"},
+      {"label": "Install agents", "description": "Apply selected agents directly"},
+      {"label": "Assemble a team", "description": "Combine agents into a coordinated team with agentic lead"},
+      {"label": "Done", "description": "End the flow"}
+    ]
+  }]
+}
+```
+
+**Teams disabled:**
+```json
+{
+  "questions": [{
+    "question": "What would you like to do with these recommendations?",
+    "header": "Next step",
+    "multiSelect": false,
+    "options": [
+      {"label": "Review an agent", "description": "Browse and edit agent markdown before installing"},
+      {"label": "Install agents", "description": "Apply selected agents directly"},
+      {"label": "Assemble a team (disabled)", "description": "Requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1"},
+      {"label": "Done", "description": "End the flow"}
+    ]
+  }]
+}
+```
+
+---
+
+### Phase 3A: Review Flow
+
+**If "Review an agent":**
+
+1. AskUserQuestion: "Which agent?"
+   ```json
    {
-     "env": {
-       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-     }
+     "questions": [{
+       "question": "Which agent would you like to review?",
+       "header": "Review",
+       "multiSelect": false,
+       "options": [
+         {"label": "agent-1", "description": "Role: [from candidate]"},
+         {"label": "agent-2", "description": "Role: [from candidate]"}
+       ]
+     }]
    }
-3. Restart Claude Code
-4. Re-run /recommend
+   ```
 
-You can also set it in your shell:
-   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
+2. Call `get_agent_details` for selected agent
 
-Once enabled, you'll be able to:
-- Assemble agents into coordinated teams
-- Create teams programmatically with TeamCreate
-- Have teammates work in parallel on different aspects
+3. Display **inline summary**:
+   - Name, Role, Tools, Model, Source
+   - First 20 lines of system prompt
 
-Run /recommend again after enabling.
-```
+4. AskUserQuestion: "What to do?"
+   ```json
+   {
+     "questions": [{
+       "question": "What would you like to do with this agent?",
+       "header": "Action",
+       "multiSelect": false,
+       "options": [
+         {"label": "Open in editor", "description": "Open in $EDITOR to customize before installing"},
+         {"label": "Install as-is", "description": "Install directly without changes"},
+         {"label": "Pass", "description": "Skip this agent"}
+       ]
+     }]
+   }
+   ```
 
-**Do not proceed with recommendation until user confirms they've enabled it or chosen to continue without.**
+5. **If "Open in editor":**
+   - Write to temp file: `~/.claude/agent-discovery-review/<agent-name>.md`
+   - Run: `$EDITOR ~/.claude/agent-discovery-review/<agent-name>.md`
+   - Wait for editor to close
+   - Read modified file
+   - AskUserQuestion: "Install customized version?"
+     ```json
+     {
+       "questions": [{
+         "question": "You've edited the agent. Ready to install?",
+         "header": "Install",
+         "multiSelect": false,
+         "options": [
+           {"label": "Install customized", "description": "Install your edited version"},
+           {"label": "Re-edit", "description": "Open editor again"},
+           {"label": "Discard", "description": "Don't install"}
+         ]
+       }]
+     }
+     ```
+   - If "Install customized": Write to `.claude/agents/<agent-name>.md`
 
-#### If "No, continue without teams":
+6. **If "Install as-is":** Call `download_agent` MCP tool
 
-Proceed with recommendation, but **note in the post-recommendation AskUserQuestion**:
-- Change "Assemble a team" option to:
-  ```json
-  {
-    "label": "Assemble a team (disabled)",
-    "description": "Requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1. Install as subagents instead?"
-  }
-  ```
-- If selected, offer to install agents as subagents
+---
 
-### If teams are already enabled (or user chose to skip check):
+### Phase 3B: Install Flow
 
-Proceed directly to recommendation + post-recommendation AskUserQuestion with full "Assemble a team" option enabled.
+**If "Install agents":**
 
-## ⚡ Post-Recommendation Interactive Workflow (REQUIRED)
+1. AskUserQuestion (multiSelect):
+   ```json
+   {
+     "questions": [{
+       "question": "Which agents would you like to install?",
+       "header": "Install",
+       "multiSelect": true,
+       "options": [
+         {"label": "agent-1", "description": "[role]"},
+         {"label": "agent-2", "description": "[role]"}
+       ]
+     }]
+   }
+   ```
 
-**After presenting recommendations, you MUST use AskUserQuestion to guide the user through next steps.** This happens automatically — the user doesn't need to trigger it.
+2. For each selected agent, call `download_agent` MCP tool
 
-### Step 1: Main Action Picker
+3. Confirm installation:
+   ```
+   ✅ Installed: agent-1, agent-2
+   
+   Use them as subagents:
+   - "Use the agent-1 subagent to [task]"
+   ```
 
-**If teams ARE enabled:** Use this format:
+---
 
-```json
-{
-  "questions": [{
-    "question": "What would you like to do with these recommendations?",
-    "header": "Next step",
-    "multiSelect": false,
-    "options": [
-      {
-        "label": "Review an agent",
-        "description": "Browse and edit agent markdown before installing"
-      },
-      {
-        "label": "Install agents",
-        "description": "Apply selected agents directly to the workspace"
-      },
-      {
-        "label": "Assemble a team",
-        "description": "Combine multiple agents into a coordinated team"
-      },
-      {
-        "label": "Done",
-        "description": "End the recommendation flow"
-      }
-    ]
-  }]
-}
-```
+### Phase 3C: Team Assembly Flow
 
-**If teams are NOT enabled:** Use this format (team option shows as disabled):
+**If "Assemble a team" (and teams enabled):**
 
-```json
-{
-  "questions": [{
-    "question": "What would you like to do with these recommendations?",
-    "header": "Next step",
-    "multiSelect": false,
-    "options": [
-      {
-        "label": "Review an agent",
-        "description": "Browse and edit agent markdown before installing"
-      },
-      {
-        "label": "Install agents",
-        "description": "Apply selected agents directly to the workspace"
-      },
-      {
-        "label": "Assemble a team (enable first)",
-        "description": "Requires CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1. Show me how to enable."
-      },
-      {
-        "label": "Done",
-        "description": "End the recommendation flow"
-      }
-    ]
-  }]
-}
-```
-
-### Step 2: Branch Based on Selection
-
-#### If "Review an agent":
-
-Use AskUserQuestion to let the user pick which agent:
-
-```json
-{
-  "questions": [{
-    "question": "Which agent would you like to review?",
-    "header": "Review",
-    "multiSelect": false,
-    "options": [
-      {"label": "agent-name-1", "description": "Role: [description from candidate]"},
-      {"label": "agent-name-2", "description": "Role: [description from candidate]"}
-      // ... for each recommended agent
-    ]
-  }]
-}
-```
-
-Then delegate to `/agent-discovery:review <agent-name>`.
-
-#### If "Install agents":
-
-Use AskUserQuestion with multiSelect to pick agents:
-
-```json
-{
-  "questions": [{
-    "question": "Which agents would you like to install?",
-    "header": "Install",
-    "multiSelect": true,
-    "options": [
-      {"label": "agent-name-1", "description": "[brief role description]"},
-      {"label": "agent-name-2", "description": "[brief role description]"}
-    ]
-  }]
-}
-```
-
-Then for each selected agent, call `download_agent` MCP tool.
-
-#### If "Assemble a team" or "Assemble a team (enable first)":
-
-**If teams are enabled:**
-
-Use AskUserQuestion with multiSelect to pick team members:
+#### Step 1: Select Team Members
 
 ```json
 {
@@ -242,87 +236,151 @@ Use AskUserQuestion with multiSelect to pick team members:
     "header": "Team",
     "multiSelect": true,
     "options": [
-      {"label": "agent-name-1", "description": "[role - e.g., Security & code quality]"},
-      {"label": "agent-name-2", "description": "[role - e.g., Test coverage]"}
+      {"label": "agent-1", "description": "[role - e.g., Security & code quality]"},
+      {"label": "agent-2", "description": "[role - e.g., Test coverage]"}
     ]
   }]
 }
 ```
 
-Then delegate to `/agent-discovery:team <agent1> <agent2> ...`.
-
-**If teams are NOT enabled:**
-
-Show the enable instructions again:
-
-```
-🔧 Enable Agent Teams
-
-To assemble teams, you need to enable experimental teams:
-
-1. Open Claude Code settings (Cmd/Ctrl + ,)
-2. Add to settings.json:
-   {
-     "env": {
-       "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
-     }
-   }
-3. Restart Claude Code
-4. Re-run /recommend
-
-Or set in your shell:
-   export CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS=1
-
-Alternatively, you can install agents individually as subagents:
-- "Install agents" → pick agents → use as subagents
-```
-
-Then use AskUserQuestion:
+#### Step 2: Team Focus
 
 ```json
 {
   "questions": [{
-    "question": "What would you like to do instead?",
-    "header": "Alternative",
+    "question": "What should the team focus on?",
+    "header": "Focus",
     "multiSelect": false,
     "options": [
-      {
-        "label": "Install as subagents",
-        "description": "Install agents individually (works without team mode)"
-      },
-      {
-        "label": "Done for now",
-        "description": "End the flow, I'll enable teams later"
-      }
+      {"label": "Code quality review", "description": "Security, performance, and test coverage review"},
+      {"label": "Feature development", "description": "Parallel implementation of different aspects"},
+      {"label": "Research & analysis", "description": "Multi-perspective investigation"},
+      {"label": "Custom", "description": "I'll describe the focus myself"}
     ]
   }]
 }
 ```
 
-If "Install as subagents", proceed with the install flow.
+#### Step 3: Built-in Agents (Optional)
 
-#### If "Done":
+```json
+{
+  "questions": [{
+    "question": "Include Claude Code's built-in agents?",
+    "header": "Built-ins",
+    "multiSelect": true,
+    "options": [
+      {"label": "Explore", "description": "Fast read-only codebase search (Haiku)"},
+      {"label": "Plan", "description": "Research agent for pre-implementation context"},
+      {"label": "General-purpose", "description": "Complex multi-step tasks"},
+      {"label": "None", "description": "Only catalog agents"}
+    ]
+  }]
+}
+```
 
-Exit gracefully with a closing message.
+#### Step 4: Create Team
 
-### Why AskUserQuestion?
+**Install selected catalog agents:**
+- For each catalog agent selected, call `download_agent` MCP tool
 
-- **Structured choices** — users see exactly what they can do
-- **multiSelect support** — pick multiple agents for install/team in one shot
-- **Inline picker** — arrow-key navigable, no typing required
-- **No permission needed** — free action, fires immediately
+**Create the team:**
+
+**If TeamCreate available (experimental teams ON):**
+
+Use `TeamCreate` with agentic lead configuration:
+
+```json
+{
+  "teamName": "[Team name based on focus]",
+  "focus": "[focus from Step 2]",
+  "lead": {
+    "model": "sonnet",
+    "instructions": "You are an agentic team lead with autonomous coordination authority.\n\nResponsibilities:\n1. Assign tasks to teammates based on their capabilities\n2. Monitor progress and reassign when stuck\n3. Validate outputs against quality criteria before completion\n4. Request revisions when work falls short\n5. Synthesize results into cohesive deliverables\n6. Make judgment calls autonomously to minimize human-in-the-loop\n\nQuality gates:\n- Code changes must pass review before commit\n- Research must be comprehensive\n- Tests must cover edge cases\n- All deliverables must be actionable\n\nYou are NOT a passive relay. You actively ensure quality."
+  },
+  "teammates": [
+    {"name": "[catalog-agent-1]", "description": "[role]"},
+    {"name": "[catalog-agent-2]", "description": "[role]"},
+    {"name": "explore", "description": "[role]"} // if selected
+  ]
+}
+```
+
+**If TeamCreate NOT available:**
+
+Show instructions:
+```
+🏗️ Team Ready: [team-name]
+
+LEAD: Agentic Coordinator (autonomous quality gates)
+TEAMMATES:
+  - [agent-1] — [role]
+  - [agent-2] — [role]
+
+To start:
+1. Add to settings.json:
+   { "env": { "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1" } }
+2. Restart Claude Code
+3. Run:
+   "Create an agent team for [focus].
+    Teammates: [agent-1] for [focus], [agent-2] for [focus].
+    Team lead should autonomously validate and coordinate."
+```
+
+---
+
+### Phase 3D: Done
+
+Exit gracefully:
+```
+✅ Recommendation flow complete.
+
+Run /recommend anytime to discover more agents.
+```
+
+---
+
+## Claude Code Built-in Agents
+
+| Agent | Model | Purpose |
+|-------|-------|---------|
+| **Explore** | Haiku | Fast read-only codebase search |
+| **Plan** | Inherits | Pre-implementation research |
+| **General-purpose** | Inherits | Complex multi-step tasks |
+
+---
+
+## Agentic Team Lead
+
+Every team has an **agentic lead** that:
+- Autonomously assigns tasks based on capabilities
+- Monitors progress and reassigns when stuck
+- Validates outputs against quality criteria
+- Requests revisions when work falls short
+- Synthesizes results into cohesive deliverables
+- Minimizes human-in-the-loop with autonomous judgment
+
+---
 
 ## MCP Tools Used
 
-- `recommend` — Broad catalog search returning candidates for LLM re-ranking
-- `search_agents` — Focused keyword search when the user's need is specific
-- `get_agent_details` — Get full details of a specific agent before recommending
-- `catalog_info` — Show catalog stats if the user asks about available agents
+- `recommend` — Catalog search
+- `search_agents` — Keyword search
+- `get_agent_details` — Fetch full agent markdown
+- `download_agent` — Install to `.claude/agents/`
+
+## Built-in Tools Used
+
+- `AskUserQuestion` — Interactive pickers throughout the flow
+- `TeamCreate` — Programmatic team creation (when available)
+- `Bash` — Open $EDITOR for agent customization
+
+---
 
 ## Important Notes
 
-- The `recommend` tool returns candidates with descriptions — you do the ranking
-- When multiple similar agents exist from different sources, explain the differences
-- Always launch AskUserQuestion after presenting recommendations
-- Never just say "Run /apply to install" and stop — that's a dead end
-- The interactive flow keeps users engaged and guides them to action
+- AskUserQuestion fires **automatically** after recommendations
+- No dead ends — every path leads to action or graceful exit
+- Agents can be customized before installation
+- Teams include agentic lead by default
+- Built-in agents supplement catalog agents when selected
