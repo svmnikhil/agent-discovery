@@ -55,12 +55,13 @@ This gives you the plugin with both slash commands. Good for development and tes
 
 | Slash Command | What it does |
 |---|---|
-| `/agent-discovery:recommend [query]` | Analyze workspace and suggest relevant agents, or search by query. |
-| `/agent-discovery:apply <name>` | Install an agent from the catalog to your project. |
+| `/agent-discovery:recommend [query]` | Discover, review, install, or assemble agents from catalog |
+| `/agent-discovery:list` | List installed agents, skills, instructions, and teams |
+| `/agent-discovery:edit <name>` | Edit an installed entry or modify a team |
 
 ### `/agent-discovery:recommend`
 
-Get agent, skill, or instruction recommendations:
+Discover, review, install, or assemble agents:
 
 ```
 /agent-discovery:recommend                    # Analyze workspace and suggest relevant items
@@ -71,25 +72,34 @@ Get agent, skill, or instruction recommendations:
 The command:
 1. Detects your project's tech stack (package.json, README, language configs)
 2. Searches the catalog for matching entries
-3. Returns ranked recommendations with explanations
-4. Provides activation guidance
+3. Presents recommendations with explanations
+4. Offers actions: review, install, or assemble into team
 
-### `/agent-discovery:apply <name>`
+### `/agent-discovery:list`
 
-Install an entry from the catalog:
+See all installed entries:
 
 ```
-/agent-discovery:apply Expert React Frontend Engineer
-/agent-discovery:apply Autoresearch
+/agent-discovery:list
 ```
 
-Items are installed to the correct directory automatically:
+Shows:
+- Agents in `.claude/agents/`
+- Skills in `.claude/skills/`
+- Instructions in `.github/instructions/`
+- Teams (if experimental teams enabled)
 
-| Type | Install Location | Activation |
-|------|-----------------|------------|
-| **Agent** | `.claude/agents/` | Appears in `/agents` command automatically |
-| **Skill** | `.claude/skills/` | Auto-discovered by Claude Code |
-| **Instruction** | `.github/instructions/` | Loaded for matching file patterns |
+### `/agent-discovery:edit <name>`
+
+Modify an installed entry:
+
+```
+/agent-discovery:edit grumpy-reviewer
+/agent-discovery:edit code-quality-team
+```
+
+- For agents/skills/instructions: opens in `$EDITOR`
+- For teams: interactive flow to add/remove teammates, change focus
 
 ## Architecture
 
@@ -100,8 +110,9 @@ agent-discovery/
 │   └── marketplace.json         # Marketplace listing
 ├── .mcp.json                    # MCP server config
 ├── skills/
-│   ├── recommend/SKILL.md       # Recommend command
-│   └── apply/SKILL.md           # Apply command
+│   ├── recommend/SKILL.md       # Discover & install flow
+│   ├── list/SKILL.md            # List installed entries
+│   └── edit/SKILL.md            # Edit entries/teams
 ├── dist/                        # Compiled JavaScript
 ├── src/
 │   ├── mcp-server.ts            # MCP tools

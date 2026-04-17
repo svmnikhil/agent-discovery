@@ -336,6 +336,10 @@ Exit gracefully:
 ✅ Recommendation flow complete.
 
 Run /recommend anytime to discover more agents.
+
+**Manage installed entries:**
+- `/agent-discovery:list` — See all installed agents/teams
+- `/agent-discovery:edit <name>` — Modify any entry
 ```
 
 ---
