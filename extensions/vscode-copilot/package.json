@@ -4,7 +4,6 @@
   "description": "Search and install 700+ AI agent configurations from the awesome-copilot catalog directly in GitHub Copilot Chat",
   "version": "0.1.0",
   "publisher": "svmnikhil",
-  "icon": "icon.png",
   "engines": {
     "vscode": "^1.100.0"
   },

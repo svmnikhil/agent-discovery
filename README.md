@@ -8,11 +8,11 @@
 
 ## The Problem
 
-Developers spend hours searching for the right AI agent configurations. The awesome-copilot catalog has 700+ entries, but finding the right one means browsing GitHub repos, reading docs, and manually copying files. And once you find the right agents — there's no way to share that setup with your team.
+Developers spend hours searching for the right AI agent configurations. The awesome-copilot catalog has 390+ entries, but finding the right one means browsing GitHub repos, reading docs, and manually copying files. And once you find the right agents — there's no way to share that setup with your team.
 
 Agent Discovery solves both problems:
 
-1. **Instant Search** — BM25-ranked search over 700+ agents, skills, and instructions from awesome-copilot and GitHub's Agent Factory. No runtime fetching, no API keys.
+1. **Instant Search** — BM25-ranked search over 390+ agents, skills, and instructions from awesome-copilot and GitHub's Agent Factory. No runtime fetching, no API keys.
 2. **One-Command Install** — Download agents directly to `.claude/agents/`, skills to `.claude/skills/`, instructions to `.github/instructions/`.
 3. **Team Portability via APM** — Generate an `apm.yml` manifest so every developer who clones your repo gets the same agent setup with `apm install`.
 
@@ -154,7 +154,7 @@ agent-discovery/
 
 ### Catalog
 
-- **Sources:** awesome-copilot (676 entries) + GitHub gh-aw Agent Factory (11 entries)
+- **Sources:** awesome-copilot (380 entries) + GitHub gh-aw Agent Factory (12 entries)
 - **Search:** BM25-style scoring — name 10x, tags 8x, description 1.5x per hit
 - **Deduplication:** Jaccard similarity clustering across sources
 - **Zero runtime fetch:** Catalog loads instantly (SQLite in Claude Code; JSON bundle in VS Code extension)
