@@ -93,8 +93,9 @@ export async function ensureApmBinary(context: vscode.ExtensionContext): Promise
 
   const storageDir = context.globalStorageUri.fsPath;
   const binDir = path.join(storageDir, 'apm-bin', APM_VERSION);
-  const binName = process.platform === 'win32' ? 'apm.exe' : 'apm';
-  const binPath = path.join(binDir, binName);
+  // binPath is relative to binDir — e.g. 'apm-darwin-arm64/apm'.
+  // The whole platform directory (binary + _internal/) must stay together.
+  const binPath = path.join(binDir, asset.binPath);
 
   if (fs.existsSync(binPath)) {
     return binPath;
@@ -115,21 +116,16 @@ export async function ensureApmBinary(context: vscode.ExtensionContext): Promise
       progress.report({ message: `Fetching ${asset.asset}…` });
       await downloadFile(url, archivePath);
 
+      // Extract directly into binDir so the full platform directory
+      // (binary + _internal/ PyInstaller runtime) lands at binDir/<platform-dir>/.
       progress.report({ message: 'Extracting…' });
-      const extractDir = path.join(os.tmpdir(), `apm-extract-${Date.now()}`);
-      fs.mkdirSync(extractDir, { recursive: true });
-      await extract(archivePath, extractDir, asset.isZip);
+      await extract(archivePath, binDir, asset.isZip);
 
-      // Copy binary to stable location
-      const extractedBin = path.join(extractDir, asset.binPath);
-      fs.copyFileSync(extractedBin, binPath);
       if (process.platform !== 'win32') {
         fs.chmodSync(binPath, 0o755);
       }
 
-      // Cleanup temp files
       try { fs.rmSync(archivePath, { force: true }); } catch { /* ignore */ }
-      try { fs.rmSync(extractDir, { recursive: true, force: true }); } catch { /* ignore */ }
 
       return binPath;
     }

@@ -115,13 +115,24 @@ After step 4c, click the **"Install agents now (apm install)"** button in the ch
 - An "Agent Discovery — apm install" Output Channel opens and shows:
   ```
   Fetching APM binary (first-run download may take ~30s)…
-  Using APM binary: /Users/<you>/Library/Application Support/Code/User/globalStorage/svmnikhil.agent-discovery-vscode/apm-bin/0.9.4/apm
+  Using APM binary: /Users/<you>/Library/Application Support/Code/User/globalStorage/svmnikhil.agent-discovery-vscode/apm-bin/0.9.4/apm-darwin-arm64/apm
   Running: apm install
   
   ✅ apm install completed.
   ```
 - A VS Code info notification: "✅ apm install completed — all agents are set up."
 - Subsequent clicks: binary is already cached, skips download entirely
+
+**Extraction smoke-test (optional, verifies layout before attempting `apm install`):**
+```bash
+# After first click, verify the extracted layout has _internal/ as a sibling:
+ls "$(dirname $(ls ~/Library/Application\ Support/Code/User/globalStorage/svmnikhil.agent-discovery-vscode/apm-bin/0.9.4/apm-*/apm))"
+# Expected: _internal  apm
+
+# Verify it runs standalone:
+~/Library/Application\ Support/Code/User/globalStorage/svmnikhil.agent-discovery-vscode/apm-bin/0.9.4/apm-darwin-arm64/apm --version
+# Expected: Agent Package Manager (APM) CLI version 0.9.4 (...)
+```
 
 ### 4f — Error case: `@agent-discovery /install thisdoesnotexist`
 
