@@ -1,0 +1,68 @@
+{
+  "name": "agent-discovery-vscode",
+  "displayName": "Agent Discovery for GitHub Copilot",
+  "description": "Search and install 700+ AI agent configurations from the awesome-copilot catalog directly in GitHub Copilot Chat",
+  "version": "0.1.0",
+  "publisher": "svmnikhil",
+  "icon": "icon.png",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": ["AI", "Chat"],
+  "keywords": ["copilot", "agents", "AI", "discovery", "awesome-copilot", "mcp", "claude"],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/svmnikhil/agent-discovery"
+  },
+  "license": "MIT",
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "chatParticipants": [
+      {
+        "id": "agent-discovery.discover",
+        "name": "agent-discovery",
+        "fullName": "Agent Discovery",
+        "description": "Search and install AI agents from 700+ curated entries in the awesome-copilot catalog",
+        "isSticky": false,
+        "commands": [
+          {
+            "name": "install",
+            "description": "Install an agent to your workspace (.claude/agents/, .claude/skills/, or .github/instructions/)"
+          },
+          {
+            "name": "apm",
+            "description": "Generate an apm.yml manifest for reproducible agent setup across your team"
+          }
+        ],
+        "disambiguation": [
+          {
+            "category": "agent_discovery",
+            "description": "The user wants to find, search, or install AI agent configurations, skills, or instructions.",
+            "examples": [
+              "Find me a code review agent",
+              "Search for React frontend agents",
+              "Install a Python testing agent",
+              "What agents are available for TypeScript?"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js",
+    "build:catalog": "node scripts/export-catalog.mjs",
+    "watch": "node esbuild.js --watch",
+    "prepare": "npm run build:catalog && npm run build",
+    "package": "npx @vscode/vsce package --no-dependencies"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/vscode": "^1.100.0",
+    "esbuild": "^0.24.0",
+    "sql.js": "^1.12.0",
+    "typescript": "^5.7.0"
+  }
+}
