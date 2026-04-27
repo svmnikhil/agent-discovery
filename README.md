@@ -1,44 +1,60 @@
 # Agent Discovery
 
-**Discover, browse, and install AI agents from curated catalogs.**
+**Discover, browse, and install AI agents from curated catalogs — in Claude Code and GitHub Copilot.**
 
-[![npm](https://img.shields.io/badge/npm-v2.0.0-blue)](https://www.npmjs.com/package/agent-discovery) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/svmnikhil/agent-discovery?style=flat&color=yellow)](https://github.com/svmnikhil/agent-discovery/stargazers)
+[![npm](https://img.shields.io/badge/npm-v0.2.0-blue)](https://www.npmjs.com/package/agent-discovery) [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE) [![GitHub stars](https://img.shields.io/github/stars/svmnikhil/agent-discovery?style=flat&color=yellow)](https://github.com/svmnikhil/agent-discovery/stargazers) [![Anthropic Marketplace](https://img.shields.io/badge/Anthropic%20Marketplace-Accepted-blueviolet)](https://github.com/svmnikhil/agent-discovery)
+
+> **Accepted into Anthropic's official Claude Code plugin marketplace** — proving real developer demand for AI agent discovery tooling.
 
 ## The Problem
 
-Developers spend hours searching for the right AI agent configurations. Awesome-copilot has 640+ entries, but finding the right one means browsing GitHub repos, reading docs, and manually copying files. There's no unified way to discover what's available or install it with a single command.
+Developers spend hours searching for the right AI agent configurations. The awesome-copilot catalog has 390+ entries, but finding the right one means browsing GitHub repos, reading docs, and manually copying files. And once you find the right agents — there's no way to share that setup with your team.
 
-Agent Discovery solves this with:
+Agent Discovery solves both problems:
 
-1. **Pre-built Catalog** — SQLite + FTS5 index of 640+ agents, skills, and instructions from awesome-copilot and GitHub's Pelis Agent Factory. No runtime fetching, instant search.
-2. **Intelligent Recommendations** — Analyze your project's tech stack (package.json, README, configs) and get relevant suggestions.
-3. **One-Command Install** — Download and install agents directly to `.claude/agents/`, skills to `.claude/skills/`, instructions to `.github/instructions/`.
+1. **Instant Search** — BM25-ranked search over 390+ agents, skills, and instructions from awesome-copilot and GitHub's Agent Factory. No runtime fetching, no API keys.
+2. **One-Command Install** — Download agents directly to `.claude/agents/`, skills to `.claude/skills/`, instructions to `.github/instructions/`.
+3. **Team Portability via APM** — Generate an `apm.yml` manifest so every developer who clones your repo gets the same agent setup with `apm install`.
+
+---
 
 ## Install
 
-### Claude Code — plugin marketplace
+### Option 1 — GitHub Copilot Chat (VS Code)
 
-**Prerequisites:** Claude Code v1.0.33+ (`claude --version`). If `/plugin` is not recognized, update first: `brew upgrade claude-code` or `npm update -g @anthropic-ai/claude-code`.
+Type `@agent-discovery` in the GitHub Copilot Chat panel.
 
-**Install:**
+**Prerequisites:** VS Code 1.100+, GitHub Copilot subscription.
+
+**Install from source (dev mode):**
+
+```bash
+git clone https://github.com/svmnikhil/agent-discovery.git
+cd agent-discovery/extensions/vscode-copilot
+npm run prepare   # exports catalog + builds
+code --extensionDevelopmentPath=$(pwd) /your/project
+```
+
+Then open GitHub Copilot Chat and type `@agent-discovery`.
+
+### Option 2 — Claude Code (plugin marketplace)
+
+**Prerequisites:** Claude Code v1.0.33+ (`claude --version`).
 
 ```bash
 /plugin marketplace add svmnikhil/agent-discovery
 /plugin install agent-discovery
 ```
 
-Restart Claude Code (or run `/reload-plugins`).
+Restart Claude Code (or `/reload-plugins`).
 
 **Verify:**
-
 ```
 /agent-discovery:recommend
 ```
 
-Should respond with recommendations based on your project context.
-
 <details>
-<summary>Alternative — Local development install</summary>
+<summary>Local development install (Claude Code)</summary>
 
 ```bash
 git clone https://github.com/svmnikhil/agent-discovery.git
@@ -47,11 +63,30 @@ npm run build
 claude --plugin-dir .
 ```
 
-This gives you the plugin with both slash commands. Good for development and testing.
-
 </details>
 
+---
+
 ## Usage
+
+### GitHub Copilot Chat (`@agent-discovery`)
+
+| Command | What it does |
+|---|---|
+| `@agent-discovery <query>` | Search the catalog and return ranked results |
+| `@agent-discovery /install <name>` | Download and install an agent to your workspace |
+| `@agent-discovery /apm` | Generate an `apm.yml` manifest for your installed agents |
+
+**Examples:**
+```
+@agent-discovery code review
+@agent-discovery react frontend testing
+@agent-discovery azure deployment
+@agent-discovery /install grumpy-reviewer
+@agent-discovery /apm
+```
+
+### Claude Code (slash commands)
 
 | Slash Command | What it does |
 |---|---|
@@ -59,88 +94,82 @@ This gives you the plugin with both slash commands. Good for development and tes
 | `/agent-discovery:list` | List installed agents, skills, instructions, and teams |
 | `/agent-discovery:edit <name>` | Edit an installed entry or modify a team |
 
-### `/agent-discovery:recommend`
+---
 
-Discover, review, install, or assemble agents:
+## Team Portability with APM
 
-```
-/agent-discovery:recommend                    # Analyze workspace and suggest relevant items
-/agent-discovery:recommend react frontend     # Search for React-focused agents
-/agent-discovery:recommend python testing     # Search for Python testing entries
-```
-
-The command:
-1. Detects your project's tech stack (package.json, README, language configs)
-2. Searches the catalog for matching entries
-3. Presents recommendations with explanations
-4. Offers actions: review, install, or assemble into team
-
-### `/agent-discovery:list`
-
-See all installed entries:
+After discovering and installing the agents your team needs, generate a portable manifest:
 
 ```
-/agent-discovery:list
+@agent-discovery /apm
 ```
 
-Shows:
-- Agents in `.claude/agents/`
-- Skills in `.claude/skills/`
-- Instructions in `.github/instructions/`
-- Teams (if experimental teams enabled)
+This produces an `apm.yml` like:
 
-### `/agent-discovery:edit <name>`
-
-Modify an installed entry:
-
-```
-/agent-discovery:edit grumpy-reviewer
-/agent-discovery:edit code-quality-team
+```yaml
+name: my-project
+version: 1.0.0
+dependencies:
+  apm:
+    - github/awesome-copilot/agents/grumpy-reviewer.agent.md
+    - github/awesome-copilot/agents/expert-react-frontend-engineer.agent.md
 ```
 
-- For agents/skills/instructions: opens in `$EDITOR`
-- For teams: interactive flow to add/remove teammates, change focus
+Commit it to your repo. Every developer who clones it runs `apm install` and gets the same agent setup — portable, reproducible, security-scanned.
+
+**APM is zero-install for you.** The VS Code extension downloads and caches the APM binary automatically on first use — click "Install agents now" in the `/apm` response and it just works, the same way the C# or Python extensions auto-install their language servers.
+
+---
 
 ## Architecture
 
 ```
 agent-discovery/
 ├── .claude-plugin/
-│   ├── plugin.json              # Plugin manifest
-│   └── marketplace.json         # Marketplace listing
-├── .mcp.json                    # MCP server config
+│   ├── plugin.json                    # Claude Code plugin manifest
+│   └── marketplace.json               # Marketplace listing
+├── .mcp.json                          # MCP server config
+├── apm.yml                            # APM manifest for this project
+├── AGENTS.md                          # Agent instructions for AI working in this codebase
+├── extensions/
+│   └── vscode-copilot/
+│       ├── src/
+│       │   ├── extension.ts           # VS Code chat participant
+│       │   ├── catalog.ts             # BM25 search (pure JS, no WASM)
+│       │   └── catalog-data.json      # Pre-exported catalog (164KB)
+│       ├── scripts/
+│       │   └── export-catalog.mjs     # Build: catalog.db → catalog-data.json
+│       └── package.json
 ├── skills/
-│   ├── recommend/SKILL.md       # Discover & install flow
-│   ├── list/SKILL.md            # List installed entries
-│   └── edit/SKILL.md            # Edit entries/teams
-├── dist/                        # Compiled JavaScript
+│   ├── recommend/SKILL.md             # Interactive discover+install flow
+│   ├── list/SKILL.md                  # List installed entries
+│   └── edit/SKILL.md                  # Edit entries/teams
 ├── src/
-│   ├── mcp-server.ts            # MCP tools
-│   ├── catalog.ts               # SQLite + FTS5 catalog
-│   └── types.ts                 # TypeScript interfaces
-├── catalog/
-│   └── catalog.db               # Pre-built catalog (640+ entries)
-└── package.json
+│   ├── mcp-server.ts                  # MCP tools (5 total)
+│   ├── catalog.ts                     # SQLite BM25 catalog reader
+│   └── types.ts                       # TypeScript interfaces
+└── catalog/
+    └── catalog.db                     # Pre-built SQLite catalog (687 entries)
 ```
 
-### Pre-built Catalog
+### Catalog
 
-The plugin ships with a pre-built SQLite database:
+- **Sources:** awesome-copilot (380 entries) + GitHub gh-aw Agent Factory (12 entries)
+- **Search:** BM25-style scoring — name 10x, tags 8x, description 1.5x per hit
+- **Deduplication:** Jaccard similarity clustering across sources
+- **Zero runtime fetch:** Catalog loads instantly (SQLite in Claude Code; JSON bundle in VS Code extension)
 
-- **Sources:** awesome-copilot (llms.txt) + GitHub Pelis Agent Factory
-- **Search:** FTS5 full-text search with BM25 ranking
-- **Deduplication:** Cross-source duplicate detection
-- **Zero runtime fetch:** Catalog loads instantly from disk
-
-## MCP Tools
+### MCP Tools (Claude Code)
 
 | Tool | Description |
 |------|-------------|
 | `search_agents` | Search catalog by query and type filter |
 | `recommend` | Get recommendations based on project context |
-| `get_agent_details` | Get full content for a specific entry |
+| `get_agent_details` | Get full agent content |
 | `download_agent` | Download and install an entry |
 | `catalog_info` | Get catalog statistics and source info |
+
+---
 
 ## Development
 
@@ -148,15 +177,20 @@ The plugin ships with a pre-built SQLite database:
 # Install dependencies
 npm install
 
-# Build TypeScript
+# Build TypeScript (Claude Code plugin)
 npm run build
 
-# Build catalog from sources
+# Rebuild catalog from sources (requires GITHUB_TOKEN for gh-aw)
 npm run build-catalog
 
-# Run tests
-npm test
+# Build VS Code extension
+cd extensions/vscode-copilot
+npm run prepare      # export catalog JSON + compile
+npm run build        # compile only
+npm run package      # create .vsix
 ```
+
+---
 
 ## License
 

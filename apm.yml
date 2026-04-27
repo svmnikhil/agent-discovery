@@ -1,0 +1,18 @@
+# apm.yml — Agent Package Manager manifest for agent-discovery
+# Run `apm install` to set up the full agent discovery toolchain on any machine.
+# See: https://github.com/microsoft/apm
+
+name: agent-discovery
+version: 0.2.0
+
+dependencies:
+  apm:
+    # The agent-discovery plugin itself (Claude Code)
+    - svmnikhil/agent-discovery
+
+  mcp:
+    # Agent Discovery MCP server — search and install 700+ agents from the catalog
+    - name: agent-discovery
+      command: node
+      args:
+        - "${APM_PACKAGE_ROOT}/dist/mcp-server.js"

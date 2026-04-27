@@ -1,0 +1,102 @@
+{
+  "name": "agent-discovery-vscode",
+  "displayName": "Agent Discovery for GitHub Copilot",
+  "description": "Search and install 390+ AI agent configurations from the awesome-copilot catalog directly in GitHub Copilot Chat",
+  "version": "0.1.0",
+  "publisher": "svmnikhil",
+  "engines": {
+    "vscode": "^1.100.0"
+  },
+  "categories": [
+    "AI",
+    "Chat"
+  ],
+  "keywords": [
+    "copilot",
+    "agents",
+    "AI",
+    "discovery",
+    "awesome-copilot",
+    "mcp",
+    "claude"
+  ],
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/svmnikhil/agent-discovery"
+  },
+  "bugs": {
+    "url": "https://github.com/svmnikhil/agent-discovery/issues"
+  },
+  "license": "MIT",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
+  "activationEvents": [],
+  "main": "./dist/extension.js",
+  "contributes": {
+    "commands": [
+      {
+        "command": "agent-discovery.runApmInstall",
+        "title": "Agent Discovery: Install agents (apm install)"
+      },
+      {
+        "command": "agent-discovery.saveApm",
+        "title": "Agent Discovery: Save apm.yml"
+      },
+      {
+        "command": "agent-discovery.searchMore",
+        "title": "Agent Discovery: Show more results"
+      }
+    ],
+    "chatParticipants": [
+      {
+        "id": "agent-discovery.discover",
+        "name": "agent-discovery",
+        "fullName": "Agent Discovery",
+        "description": "Search and install AI agents from 390+ curated entries in the awesome-copilot catalog",
+        "isSticky": false,
+        "commands": [
+          {
+            "name": "install",
+            "description": "Install an agent to your workspace (.claude/agents/, .claude/skills/, or .github/instructions/)"
+          },
+          {
+            "name": "apm",
+            "description": "Generate an apm.yml manifest for reproducible agent setup across your team"
+          }
+        ],
+        "disambiguation": [
+          {
+            "category": "agent_discovery",
+            "description": "The user wants to find, search, or install AI agent configurations, skills, or instructions.",
+            "examples": [
+              "Find me a code review agent",
+              "Search for React frontend agents",
+              "Install a Python testing agent",
+              "What agents are available for TypeScript?"
+            ]
+          }
+        ]
+      }
+    ]
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run build",
+    "build": "node esbuild.js",
+    "build:catalog": "node scripts/export-catalog.mjs",
+    "watch": "node esbuild.js --watch",
+    "prepare": "npm run build:catalog && npm run build",
+    "package": "npx @vscode/vsce package --no-dependencies",
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "@types/vscode": "^1.100.0",
+    "esbuild": "^0.24.0",
+    "sql.js": "^1.12.0",
+    "typescript": "^5.7.0",
+    "vitest": "^4.1.5"
+  }
+}
