@@ -28,6 +28,11 @@
     "url": "https://github.com/svmnikhil/agent-discovery/issues"
   },
   "license": "MIT",
+  "icon": "icon.png",
+  "galleryBanner": {
+    "color": "#1e1e2e",
+    "theme": "dark"
+  },
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
