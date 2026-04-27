@@ -1,7 +1,7 @@
 {
   "name": "agent-discovery-vscode",
   "displayName": "Agent Discovery for GitHub Copilot",
-  "description": "Search and install 700+ AI agent configurations from the awesome-copilot catalog directly in GitHub Copilot Chat",
+  "description": "Search and install 390+ AI agent configurations from the awesome-copilot catalog directly in GitHub Copilot Chat",
   "version": "0.1.0",
   "publisher": "svmnikhil",
   "engines": {
@@ -23,6 +23,9 @@
   "repository": {
     "type": "git",
     "url": "https://github.com/svmnikhil/agent-discovery"
+  },
+  "bugs": {
+    "url": "https://github.com/svmnikhil/agent-discovery/issues"
   },
   "license": "MIT",
   "activationEvents": [],
@@ -47,7 +50,7 @@
         "id": "agent-discovery.discover",
         "name": "agent-discovery",
         "fullName": "Agent Discovery",
-        "description": "Search and install AI agents from 700+ curated entries in the awesome-copilot catalog",
+        "description": "Search and install AI agents from 390+ curated entries in the awesome-copilot catalog",
         "isSticky": false,
         "commands": [
           {
