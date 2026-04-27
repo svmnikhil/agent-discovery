@@ -106,7 +106,24 @@ Type exactly: `@agent-discovery /apm`
 - "Save apm.yml to workspace root" button → clicking it writes `apm.yml` and opens it in the editor
 - Footer: `apm install` command shown
 
-### 4d — Error case: `@agent-discovery /install thisdoesnotexist`
+### 4d — APM auto-install: click "Install agents now"
+
+After step 4c, click the **"Install agents now (apm install)"** button in the chat response.
+
+**What to look for:**
+- First run only: a VS Code notification appears: "Agent Discovery: Downloading APM…" with a progress indicator (downloads ~20MB platform binary from GitHub Releases, cached permanently in VS Code's global storage — no internet required on subsequent runs)
+- An "Agent Discovery — apm install" Output Channel opens and shows:
+  ```
+  Fetching APM binary (first-run download may take ~30s)…
+  Using APM binary: /Users/<you>/Library/Application Support/Code/User/globalStorage/svmnikhil.agent-discovery-vscode/apm-bin/0.9.4/apm
+  Running: apm install
+  
+  ✅ apm install completed.
+  ```
+- A VS Code info notification: "✅ apm install completed — all agents are set up."
+- Subsequent clicks: binary is already cached, skips download entirely
+
+### 4f — Error case: `@agent-discovery /install thisdoesnotexist`
 
 Type exactly: `@agent-discovery /install thisdoesnotexist`
 
@@ -114,7 +131,7 @@ Type exactly: `@agent-discovery /install thisdoesnotexist`
 - Message: `No catalog entry found for "thisdoesnotexist".`
 - Suggestion to search first
 
-### 4e — Empty query: `@agent-discovery`
+### 4g — Empty query: `@agent-discovery`
 
 Type exactly: `@agent-discovery` (no query after it)
 

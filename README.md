@@ -117,7 +117,7 @@ dependencies:
 
 Commit it to your repo. Every developer who clones it runs `apm install` and gets the same agent setup — portable, reproducible, security-scanned.
 
-**Install APM CLI:** `curl -sSL https://aka.ms/apm-unix | sh`
+**APM is zero-install for you.** The VS Code extension downloads and caches the APM binary automatically on first use — click "Install agents now" in the `/apm` response and it just works, the same way the C# or Python extensions auto-install their language servers.
 
 ---
 
