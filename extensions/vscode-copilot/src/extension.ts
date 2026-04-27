@@ -165,7 +165,7 @@ function formatResults(results: ReturnType<typeof searchCatalog>, query: string)
 
 // ─── Chat participant handler ─────────────────────────────────────────
 
-async function handler(
+export async function handler(
   request: vscode.ChatRequest,
   _context: vscode.ChatContext,
   stream: vscode.ChatResponseStream,
