@@ -28,6 +28,20 @@
   "activationEvents": [],
   "main": "./dist/extension.js",
   "contributes": {
+    "commands": [
+      {
+        "command": "agent-discovery.runApmInstall",
+        "title": "Agent Discovery: Install agents (apm install)"
+      },
+      {
+        "command": "agent-discovery.saveApm",
+        "title": "Agent Discovery: Save apm.yml"
+      },
+      {
+        "command": "agent-discovery.searchMore",
+        "title": "Agent Discovery: Show more results"
+      }
+    ],
     "chatParticipants": [
       {
         "id": "agent-discovery.discover",

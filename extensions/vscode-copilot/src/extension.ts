@@ -3,6 +3,7 @@ import * as https from 'https';
 import * as fs from 'fs';
 import * as path from 'path';
 import { searchCatalog, findByName, catalogStats, type CatalogEntry } from './catalog';
+import { ensureApmBinary, runApmInstall } from './apm';
 
 const PARTICIPANT_ID = 'agent-discovery.discover';
 
@@ -272,6 +273,8 @@ export async function handler(
       stream.button({ command: 'agent-discovery.saveApm', title: 'Save apm.yml to workspace root', arguments: [apmPath, yml] });
     }
 
+    stream.button({ command: 'agent-discovery.runApmInstall', title: 'Install agents now (apm install)', arguments: [workspaceRoot] });
+
     return {};
   }
 
@@ -337,6 +340,26 @@ export function activate(context: vscode.ExtensionContext) {
       const doc = await vscode.workspace.openTextDocument(vscode.Uri.file(filePath));
       await vscode.window.showTextDocument(doc);
       vscode.window.showInformationMessage('apm.yml saved! Commit it to share agent setup with your team.');
+    }),
+
+    vscode.commands.registerCommand('agent-discovery.runApmInstall', async (workspaceRoot: string) => {
+      const outputChannel = vscode.window.createOutputChannel('Agent Discovery — apm install');
+      outputChannel.show(true);
+      outputChannel.appendLine('Fetching APM binary (first-run download may take ~30s)…');
+
+      try {
+        const binaryPath = await ensureApmBinary(context);
+        outputChannel.appendLine(`Using APM binary: ${binaryPath}`);
+        outputChannel.appendLine('Running: apm install\n');
+
+        const output = await runApmInstall(binaryPath, workspaceRoot);
+        outputChannel.appendLine(output);
+        outputChannel.appendLine('\n✅ apm install completed.');
+        vscode.window.showInformationMessage('✅ apm install completed — all agents are set up.');
+      } catch (err: any) {
+        outputChannel.appendLine(`\n❌ Error: ${err.message}`);
+        vscode.window.showErrorMessage(`apm install failed: ${err.message}`);
+      }
     }),
 
     vscode.commands.registerCommand('agent-discovery.searchMore', async (query: string) => {
