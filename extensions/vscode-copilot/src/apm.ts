@@ -10,7 +10,6 @@ const APM_BASE_URL = `https://github.com/microsoft/apm/releases/download/v${APM_
 
 interface PlatformAsset {
   asset: string;      // filename in GitHub Releases
-  binPath: string;    // path inside extracted dir
   isZip: boolean;
 }
 
@@ -19,19 +18,19 @@ function platformAsset(): PlatformAsset | null {
   const arch = process.arch;
 
   if (plat === 'darwin' && arch === 'arm64') {
-    return { asset: 'apm-darwin-arm64.tar.gz', binPath: 'apm-darwin-arm64/apm', isZip: false };
+    return { asset: 'apm-darwin-arm64.tar.gz', isZip: false };
   }
   if (plat === 'darwin' && arch === 'x64') {
-    return { asset: 'apm-darwin-x86_64.tar.gz', binPath: 'apm-darwin-x86_64/apm', isZip: false };
+    return { asset: 'apm-darwin-x86_64.tar.gz', isZip: false };
   }
   if (plat === 'linux' && arch === 'arm64') {
-    return { asset: 'apm-linux-arm64.tar.gz', binPath: 'apm-linux-arm64/apm', isZip: false };
+    return { asset: 'apm-linux-arm64.tar.gz', isZip: false };
   }
   if (plat === 'linux' && arch === 'x64') {
-    return { asset: 'apm-linux-x86_64.tar.gz', binPath: 'apm-linux-x86_64/apm', isZip: false };
+    return { asset: 'apm-linux-x86_64.tar.gz', isZip: false };
   }
   if (plat === 'win32' && arch === 'x64') {
-    return { asset: 'apm-windows-x86_64.zip', binPath: 'apm-windows-x86_64/apm.exe', isZip: true };
+    return { asset: 'apm-windows-x86_64.zip', isZip: true };
   }
   return null;
 }
@@ -64,7 +63,6 @@ function extract(archivePath: string, destDir: string, isZip: boolean): Promise<
     let args: string[];
 
     if (isZip) {
-      // Windows: PowerShell Expand-Archive
       cmd = 'powershell';
       args = ['-NoProfile', '-Command', `Expand-Archive -Force -Path "${archivePath}" -DestinationPath "${destDir}"`];
     } else {
@@ -81,9 +79,45 @@ function extract(archivePath: string, destDir: string, isZip: boolean): Promise<
   });
 }
 
+/** Recursively find first file with the given name inside dir. */
+function findFile(dir: string, name: string): string | null {
+  let entries: fs.Dirent[];
+  try {
+    entries = fs.readdirSync(dir, { withFileTypes: true });
+  } catch {
+    return null;
+  }
+  for (const entry of entries) {
+    const full = path.join(dir, entry.name);
+    if (entry.isDirectory()) {
+      const found = findFile(full, name);
+      if (found) { return found; }
+    } else if (entry.name === name) {
+      return full;
+    }
+  }
+  return null;
+}
+
+/** Run `binaryPath --version`; throw with stdout+stderr if it exits non-zero. */
+function verifyBinary(binaryPath: string): void {
+  const result = child_process.spawnSync(binaryPath, ['--version'], { timeout: 10_000 });
+  if (result.status !== 0) {
+    const out = (result.stdout?.toString() ?? '') + (result.stderr?.toString() ?? '');
+    throw new Error(
+      `APM binary self-test failed (exit ${result.status}).\n${out}\n` +
+      `Check that _internal/ exists as a sibling of: ${binaryPath}`
+    );
+  }
+}
+
 /**
  * Returns the path to the apm binary, downloading it on first use.
  * Subsequent calls return immediately if the binary is already present.
+ *
+ * The archive may contain the binary inside a platform-named subdirectory
+ * (e.g. apm-darwin-arm64/apm). We locate it dynamically so that _internal/
+ * always lands as a sibling of the binary regardless of the archive layout.
  */
 export async function ensureApmBinary(context: vscode.ExtensionContext): Promise<string> {
   const asset = platformAsset();
@@ -91,14 +125,15 @@ export async function ensureApmBinary(context: vscode.ExtensionContext): Promise
     throw new Error(`Unsupported platform: ${process.platform}/${process.arch}`);
   }
 
+  const binaryName = process.platform === 'win32' ? 'apm.exe' : 'apm';
   const storageDir = context.globalStorageUri.fsPath;
   const binDir = path.join(storageDir, 'apm-bin', APM_VERSION);
-  // binPath is relative to binDir — e.g. 'apm-darwin-arm64/apm'.
-  // The whole platform directory (binary + _internal/) must stay together.
-  const binPath = path.join(binDir, asset.binPath);
+  // Final resting place: binDir/apm-home/<binaryName>  (+ _internal/ as sibling)
+  const finalHome = path.join(binDir, 'apm-home');
+  const binaryPath = path.join(finalHome, binaryName);
 
-  if (fs.existsSync(binPath)) {
-    return binPath;
+  if (fs.existsSync(binaryPath)) {
+    return binaryPath;
   }
 
   return vscode.window.withProgress(
@@ -116,18 +151,41 @@ export async function ensureApmBinary(context: vscode.ExtensionContext): Promise
       progress.report({ message: `Fetching ${asset.asset}…` });
       await downloadFile(url, archivePath);
 
-      // Extract directly into binDir so the full platform directory
-      // (binary + _internal/ PyInstaller runtime) lands at binDir/<platform-dir>/.
-      progress.report({ message: 'Extracting…' });
-      await extract(archivePath, binDir, asset.isZip);
+      // Use a temp dir inside binDir so rename stays on the same volume
+      const extractTmp = path.join(binDir, `extract-tmp-${Date.now()}`);
+      fs.mkdirSync(extractTmp, { recursive: true });
 
-      if (process.platform !== 'win32') {
-        fs.chmodSync(binPath, 0o755);
+      try {
+        progress.report({ message: 'Extracting…' });
+        await extract(archivePath, extractTmp, asset.isZip);
+
+        // Find the binary anywhere in the extracted tree
+        const foundBinary = findFile(extractTmp, binaryName);
+        if (!foundBinary) {
+          throw new Error(`Could not find '${binaryName}' inside the archive`);
+        }
+
+        // The binary's parent is the "home" dir — _internal/ is already its sibling
+        const extractedHome = path.dirname(foundBinary);
+
+        if (fs.existsSync(finalHome)) {
+          fs.rmSync(finalHome, { recursive: true, force: true });
+        }
+        // Atomic rename: keeps _internal/ alongside the binary
+        fs.renameSync(extractedHome, finalHome);
+      } finally {
+        try { fs.rmSync(extractTmp, { recursive: true, force: true }); } catch { /* ignore */ }
+        try { fs.rmSync(archivePath, { force: true }); } catch { /* ignore */ }
       }
 
-      try { fs.rmSync(archivePath, { force: true }); } catch { /* ignore */ }
+      if (process.platform !== 'win32') {
+        fs.chmodSync(binaryPath, 0o755);
+      }
 
-      return binPath;
+      // Fail loud if the binary can't load its Python runtime
+      verifyBinary(binaryPath);
+
+      return binaryPath;
     }
   );
 }
