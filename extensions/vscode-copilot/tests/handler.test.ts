@@ -36,7 +36,25 @@ vi.mock('vscode', () => ({
     showErrorMessage: vi.fn(),
     showQuickPick: vi.fn(),
   },
+  LanguageModelChatMessage: {
+    User: (content: string) => ({ role: 'user', content }),
+  },
 }));
+
+// ─── skill-runner mock ──────────────────────────────────────────────────────
+// Tests reconfigure `_runSkillImpl` per-case to stub success/failure.
+export let _runSkillImpl: ((workspaceRoot: string) => Promise<any>) | null = null;
+vi.mock('../src/skill-runner', async () => {
+  // Re-export the real error classes so `instanceof` checks in the handler match.
+  const actual = await vi.importActual<typeof import('../src/skill-runner')>('../src/skill-runner');
+  return {
+    ...actual,
+    runAcquireCodebaseKnowledge: vi.fn(async (workspaceRoot: string) => {
+      if (!_runSkillImpl) throw new Error('Test did not configure _runSkillImpl');
+      return _runSkillImpl(workspaceRoot);
+    }),
+  };
+});
 
 // ─── https mock ─────────────────────────────────────────────────────────────
 const MOCK_AGENT_CONTENT = `---
@@ -72,8 +90,16 @@ vi.mock('https', () => ({
 }));
 
 // ─── import handler AFTER mocks are set up ──────────────────────────────────
-import { handler } from '../src/extension';
+import { handler, activate } from '../src/extension';
 import { searchCatalog } from '../src/catalog';
+import { MissingPythonError, LmOutputInvalidError, ScanTimeoutError } from '../src/skill-runner';
+
+// Activate once so `extensionRoot` (module state in extension.ts) is set.
+// The /review handler short-circuits with 'Extension not yet activated.' otherwise.
+activate({
+  extensionUri: { fsPath: '/fake/extension' } as any,
+  subscriptions: { push: () => {} },
+} as any);
 
 // ─── Test helpers ────────────────────────────────────────────────────────────
 
@@ -341,5 +367,170 @@ describe('@agent-discovery chat handler', () => {
       makeToken(true) // cancelled
     );
     expect(result).toBeDefined();
+  });
+
+  // ── /review ───────────────────────────────────────────────────────────────
+
+  describe('/review command', () => {
+    const fakeModel = { sendRequest: vi.fn() };
+
+    function reviewRequest(model: any = fakeModel) {
+      return { command: 'review', prompt: '', model } as any;
+    }
+
+    function configureSkill(impl: (workspaceRoot: string) => Promise<any>) {
+      _runSkillImpl = impl;
+    }
+
+    function successfulSkill(stackMd: string, lmQueries: any[] = []) {
+      return async (workspaceRoot: string) => {
+        const stackPath = join(workspaceRoot, 'docs', 'codebase', 'STACK.md');
+        require('fs').mkdirSync(join(workspaceRoot, 'docs', 'codebase'), { recursive: true });
+        require('fs').writeFileSync(stackPath, stackMd, 'utf-8');
+        return { stackMdPath: stackPath, stackMdContent: stackMd, lmSuggestedQueries: lmQueries };
+      };
+    }
+
+    afterEach(() => { _runSkillImpl = null; });
+
+    it('errors out with no workspace', async () => {
+      _workspaceFolders = null;
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).toMatch(/no workspace/i);
+    });
+
+    it('short-circuits self-recursion (root package.json#name === agent-discovery)', async () => {
+      require('fs').writeFileSync(join(tempDir, 'package.json'),
+        JSON.stringify({ name: 'agent-discovery' }), 'utf-8');
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).toMatch(/agent-discovery.*repo itself/);
+    });
+
+    it('errors when no LanguageModelChat is available', async () => {
+      const s = makeStream();
+      // Pass null explicitly — `undefined` would re-trigger the default-param `fakeModel`.
+      await handler(reviewRequest(null), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).toMatch(/Copilot Chat/);
+    });
+
+    it('happy path: renders Per-technology, Cross-cutting, and Adapted groups', async () => {
+      const stackMd = `# Stack
+
+### 1) Runtime Summary
+- Language: TypeScript
+
+### 2) Production Frameworks and Dependencies
+- react
+- vite
+
+### 5) Environment and Config
+- Dockerfile present
+`;
+      configureSkill(successfulSkill(stackMd, [
+        // `bicep` matches Azure AVM Bicep mode in the real catalog and isn't
+        // in any static-query set, so it surfaces under "Adapted to your stack".
+        { group: 'stack-adapted', label: 'Bicep', query: 'bicep', why: 'Azure Bicep templates detected' },
+      ]));
+
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      const md = s.markdown();
+
+      expect(md).toContain('## Per-technology recommendations');
+      expect(md).toContain('## Cross-cutting concerns');
+      expect(md).toContain('## Adapted to your stack');
+      expect(md).toContain('### React');
+      expect(md).toContain('### Bicep');
+      expect(md).toContain('(LM-suggested)');
+      expect(md).toMatch(/Detected stack/);
+
+      // [Open STACK.md] button registered
+      expect(s.buttons().some(b => b.title === 'Open STACK.md')).toBe(true);
+
+      // STACK.md present on disk
+      expect(existsSync(join(tempDir, 'docs', 'codebase', 'STACK.md'))).toBe(true);
+    });
+
+    it('omits "Adapted to your stack" when LM suggested no queries', async () => {
+      const stackMd = `# Stack
+
+### 1) Runtime Summary
+- Language: TypeScript
+
+### 2) Production Frameworks and Dependencies
+- react
+`;
+      configureSkill(successfulSkill(stackMd, []));
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      const md = s.markdown();
+
+      expect(md).not.toContain('## Adapted to your stack');
+      expect(md).toContain('## Per-technology recommendations');
+    });
+
+    it('omits Per-technology when stack is empty (only cross-cutting renders)', async () => {
+      configureSkill(successfulSkill('# Stack\n\nNothing detected.\n', []));
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      const md = s.markdown();
+
+      expect(md).not.toContain('## Per-technology recommendations');
+      expect(md).toContain('## Cross-cutting concerns');
+    });
+
+    it('renders MissingPythonError with install guidance', async () => {
+      configureSkill(async () => { throw new MissingPythonError(); });
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).toMatch(/Python 3\.8\+/);
+    });
+
+    it('renders ScanTimeoutError friendly message', async () => {
+      configureSkill(async () => { throw new ScanTimeoutError(); });
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).toMatch(/60s/);
+    });
+
+    it('renders LmOutputInvalidError friendly message', async () => {
+      configureSkill(async () => { throw new LmOutputInvalidError('bad'); });
+      const s = makeStream();
+      await handler(reviewRequest(), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).toMatch(/unparseable STACK\.md/);
+    });
+  });
+
+  // ── /review nudge in lexical path ─────────────────────────────────────────
+
+  describe('low-result nudge', () => {
+    it('appends /review tip when results ≤ 1 and workspace is open', async () => {
+      const s = makeStream();
+      await handler(makeRequest(undefined, 'blarfzorpnoggle'), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).toMatch(/Try `@agent-discovery \/review`/);
+    });
+
+    it('does not append nudge when results are plentiful', async () => {
+      const s = makeStream();
+      await handler(makeRequest(undefined, 'code review'), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).not.toMatch(/Try `@agent-discovery \/review`/);
+    });
+
+    it('does not append nudge when no workspace is open', async () => {
+      _workspaceFolders = null;
+      const s = makeStream();
+      await handler(makeRequest(undefined, 'blarfzorpnoggle'), makeContext(), s.stream as any, makeToken());
+      expect(s.markdown()).not.toMatch(/Try `@agent-discovery \/review`/);
+    });
+  });
+
+  // ── Welcome lists /review ─────────────────────────────────────────────────
+
+  it('empty-prompt welcome mentions /review', async () => {
+    const s = makeStream();
+    await handler(makeRequest(undefined, ''), makeContext(), s.stream as any, makeToken());
+    expect(s.markdown()).toContain('/review');
   });
 });

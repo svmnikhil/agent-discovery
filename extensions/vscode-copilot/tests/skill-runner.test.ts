@@ -1,0 +1,213 @@
+/**
+ * Tests for runAcquireCodebaseKnowledge — mocks child_process + vscode.
+ *
+ * The runner spawns scan.py and then calls the chat LM. We mock both:
+ *   - `spawnSync('python3', ['--version'])` to control the prerequisite check
+ *   - `spawn('python3', [scanScriptPath, ...])` to control the scan
+ *   - `model.sendRequest` to control the LM response
+ */
+
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest';
+import { mkdtempSync, rmSync, existsSync, readFileSync, writeFileSync, mkdirSync } from 'fs';
+import { join } from 'path';
+import { tmpdir } from 'os';
+import { EventEmitter } from 'events';
+
+// ─── child_process mock ─────────────────────────────────────────────────────
+// Tests configure these before calling runAcquireCodebaseKnowledge.
+
+let spawnSyncMock = vi.fn();
+let spawnMock = vi.fn();
+
+vi.mock('child_process', () => ({
+  spawnSync: (...args: any[]) => spawnSyncMock(...args),
+  spawn:     (...args: any[]) => spawnMock(...args),
+}));
+
+// ─── vscode mock ────────────────────────────────────────────────────────────
+
+vi.mock('vscode', () => ({
+  LanguageModelChatMessage: {
+    User: (content: string) => ({ role: 'user', content }),
+  },
+}));
+
+// ─── imports AFTER mocks ────────────────────────────────────────────────────
+import {
+  runAcquireCodebaseKnowledge,
+  MissingPythonError, ScanTimeoutError, ScanFailedError, LmOutputInvalidError,
+} from '../src/skill-runner';
+
+// ─── helpers ────────────────────────────────────────────────────────────────
+
+/** Build a fake `LanguageModelChat` whose sendRequest yields the given chunks. */
+function makeModel(chunks: string[]): any {
+  return {
+    async sendRequest(_messages: unknown, _opts: unknown, _token: unknown) {
+      async function* gen() { for (const c of chunks) yield c; }
+      return { text: gen() };
+    },
+  };
+}
+
+function makeToken() {
+  return {
+    isCancellationRequested: false,
+    onCancellationRequested: () => ({ dispose: () => {} }),
+  } as any;
+}
+
+/** Fake ChildProcess that emits the configured stderr and exit code. */
+function fakeChildProcess(opts: { exitCode: number; stderr?: string; delayMs?: number; hangForever?: boolean }) {
+  const ee = new EventEmitter() as any;
+  ee.stderr = new EventEmitter();
+  ee.kill = vi.fn();
+  setImmediate(() => {
+    if (opts.stderr) ee.stderr.emit('data', Buffer.from(opts.stderr));
+    if (opts.hangForever) return;
+    setTimeout(() => ee.emit('close', opts.exitCode), opts.delayMs ?? 0);
+  });
+  return ee;
+}
+
+// ─── tests ──────────────────────────────────────────────────────────────────
+
+describe('runAcquireCodebaseKnowledge', () => {
+  let workspaceRoot: string;
+  let bundledSkillRoot: string;
+
+  beforeEach(() => {
+    workspaceRoot = mkdtempSync(join(tmpdir(), 'skill-runner-ws-'));
+    bundledSkillRoot = mkdtempSync(join(tmpdir(), 'skill-runner-bundle-'));
+    // Vendor fake skill assets so the runner can read them.
+    mkdirSync(join(bundledSkillRoot, 'scripts'), { recursive: true });
+    mkdirSync(join(bundledSkillRoot, 'assets', 'templates'), { recursive: true });
+    writeFileSync(join(bundledSkillRoot, 'scripts', 'scan.py'), '# fake', 'utf-8');
+    writeFileSync(join(bundledSkillRoot, 'assets', 'templates', 'STACK.md'), '# Stack template', 'utf-8');
+
+    // Default: python is available, scan succeeds, writes a canned scan output.
+    spawnSyncMock = vi.fn(() => ({ error: null, status: 0, stdout: 'Python 3.11', stderr: '' }));
+    spawnMock = vi.fn((_cmd: string, args: string[]) => {
+      // args[1] is --output, args[2] is the output path
+      const outputPath = args[args.indexOf('--output') + 1];
+      writeFileSync(outputPath, '=== SCAN OUTPUT ===\nfake scan content', 'utf-8');
+      return fakeChildProcess({ exitCode: 0 });
+    });
+  });
+
+  afterEach(() => {
+    rmSync(workspaceRoot, { recursive: true, force: true });
+    rmSync(bundledSkillRoot, { recursive: true, force: true });
+    vi.clearAllMocks();
+  });
+
+  it('writes STACK.md and parses LM-suggested queries (happy path)', async () => {
+    const lmResponse = [
+      '# Stack\n\n### Runtime Summary\n\n- TypeScript\n',
+      '\n<!-- AGENT-DISCOVERY-QUERIES -->\n```json\n',
+      '{ "queries": [ ',
+      '{ "label": "Observability", "query": "opentelemetry instrumentation", "why": "Otel detected" },',
+      '{ "label": "Monorepo", "query": "turborepo build", "why": "turbo.json detected" }',
+      ' ] }\n```\n',
+    ];
+    const result = await runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(lmResponse), makeToken(), () => {},
+    );
+
+    const stackPath = join(workspaceRoot, 'docs', 'codebase', 'STACK.md');
+    expect(existsSync(stackPath)).toBe(true);
+    const written = readFileSync(stackPath, 'utf-8');
+    expect(written).toContain('# Stack');
+    expect(written).not.toContain('AGENT-DISCOVERY-QUERIES'); // queries block stripped
+    expect(written).toContain('Generated by @agent-discovery /review');
+
+    expect(result.lmSuggestedQueries).toHaveLength(2);
+    expect(result.lmSuggestedQueries[0]).toMatchObject({
+      group: 'stack-adapted',
+      label: 'Observability',
+      query: 'opentelemetry instrumentation',
+    });
+  });
+
+  it('returns lmSuggestedQueries = [] on malformed JSON (no throw)', async () => {
+    const lmResponse = [
+      '# Stack\n\nSome content.\n',
+      '<!-- AGENT-DISCOVERY-QUERIES -->\n```json\n{ broken json',
+      '\n```\n',
+    ];
+    const result = await runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(lmResponse), makeToken(), () => {},
+    );
+    expect(result.lmSuggestedQueries).toEqual([]);
+    expect(existsSync(result.stackMdPath)).toBe(true);
+  });
+
+  it('rejects malformed entries individually (empty query / >5 tokens / missing label)', async () => {
+    const lmResponse = [
+      '# Stack\n\nx\n<!-- AGENT-DISCOVERY-QUERIES -->\n```json\n',
+      JSON.stringify({ queries: [
+        { label: 'Good', query: 'react testing', why: 'ok' },
+        { label: '',     query: 'no label',      why: 'x'  },
+        { label: 'L',    query: 'a b c d e f g', why: 'too many tokens' },
+        { label: 'L',    query: '',              why: 'empty' },
+        { label: 'L2',   query: 'x'.repeat(60),  why: 'too long' },
+      ] }),
+      '\n```',
+    ];
+    const result = await runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(lmResponse), makeToken(), () => {},
+    );
+    expect(result.lmSuggestedQueries).toHaveLength(1);
+    expect(result.lmSuggestedQueries[0].query).toBe('react testing');
+  });
+
+  it('returns lmSuggestedQueries = [] when no marker is present', async () => {
+    const lmResponse = ['# Stack\n\nNo queries marker here.\n'];
+    const result = await runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(lmResponse), makeToken(), () => {},
+    );
+    expect(result.lmSuggestedQueries).toEqual([]);
+    expect(readFileSync(result.stackMdPath, 'utf-8')).toContain('# Stack');
+  });
+
+  it('throws LmOutputInvalidError when STACK.md is empty', async () => {
+    await expect(runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(['']), makeToken(), () => {},
+    )).rejects.toBeInstanceOf(LmOutputInvalidError);
+  });
+
+  it('throws LmOutputInvalidError when STACK.md lacks # Stack heading', async () => {
+    await expect(runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(['# Other Title\nbody']), makeToken(), () => {},
+    )).rejects.toBeInstanceOf(LmOutputInvalidError);
+  });
+
+  it('throws MissingPythonError when python3 is absent', async () => {
+    spawnSyncMock = vi.fn(() => ({ error: new Error('ENOENT'), status: null, stdout: '', stderr: '' }));
+    await expect(runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(['# Stack\nx']), makeToken(), () => {},
+    )).rejects.toBeInstanceOf(MissingPythonError);
+  });
+
+  it('throws ScanFailedError when scan.py exits non-zero (with stderr)', async () => {
+    spawnMock = vi.fn(() => fakeChildProcess({ exitCode: 2, stderr: 'boom in scan' }));
+    await expect(runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(['# Stack\nx']), makeToken(), () => {},
+    )).rejects.toMatchObject({ message: expect.stringContaining('boom in scan') });
+  });
+
+  it('throws ScanTimeoutError when scan.py hangs', async () => {
+    spawnMock = vi.fn(() => fakeChildProcess({ exitCode: 0, hangForever: true }));
+    vi.useFakeTimers();
+    const p = runAcquireCodebaseKnowledge(
+      workspaceRoot, bundledSkillRoot, makeModel(['# Stack\nx']), makeToken(), () => {},
+    );
+    // Claim ownership of the rejection immediately so vitest doesn't flag it
+    // as unhandled while we advance the fake timer.
+    const guarded = p.catch(e => e);
+    await vi.advanceTimersByTimeAsync(60_001);
+    const err = await guarded;
+    expect(err).toBeInstanceOf(ScanTimeoutError);
+    vi.useRealTimers();
+  });
+});
