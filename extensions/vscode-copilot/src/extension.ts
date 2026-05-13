@@ -4,8 +4,21 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { searchCatalog, findByName, catalogStats, type CatalogEntry } from './catalog';
 import { ensureApmBinary, runApmInstall } from './apm';
+import {
+  runAcquireCodebaseKnowledge,
+  MissingPythonError, ScanTimeoutError, ScanFailedError, LmOutputInvalidError,
+  type SkillResult,
+} from './skill-runner';
+import { parseStackMd } from './stack-md-parser';
+import { proposeStaticQueries, mergeQueries, type ProposedQuery, type QueryGroup } from './query-mapping';
 
 const PARTICIPANT_ID = 'agent-discovery.discover';
+
+/**
+ * Set by activate(). The `/review` command resolves bundled-skill assets
+ * (vendored at build time into dist/bundled-skill/) relative to this URI.
+ */
+let extensionRoot: vscode.Uri | null = null;
 
 // ─── HTTP fetch ───────────────────────────────────────────────────────
 
@@ -278,6 +291,93 @@ export async function handler(
     return {};
   }
 
+  // /review — scan workspace and recommend agents tailored to the detected stack
+  if (request.command === 'review') {
+    const workspaceFolders = vscode.workspace.workspaceFolders;
+    if (!workspaceFolders?.length) {
+      stream.markdown('No workspace folder open. Open a project folder first.');
+      return {};
+    }
+    const workspaceRoot = workspaceFolders[0].uri.fsPath;
+
+    // Self-recursion guard: don't run /review inside the agent-discovery repo itself.
+    const rootPkg = path.join(workspaceRoot, 'package.json');
+    if (fs.existsSync(rootPkg)) {
+      try {
+        const pkg = JSON.parse(fs.readFileSync(rootPkg, 'utf-8'));
+        if (pkg?.name === 'agent-discovery') {
+          stream.markdown('Detected the `agent-discovery` repo itself — `/review` is meant for downstream projects. Try it in another workspace.');
+          return {};
+        }
+      } catch { /* ignore parse errors */ }
+    }
+
+    const model = (request as { model?: vscode.LanguageModelChat }).model;
+    if (!model) {
+      stream.markdown('**`/review` requires Copilot Chat to be enabled** with a working language model. Sign in to Copilot and try again.');
+      return {};
+    }
+
+    if (!extensionRoot) {
+      stream.markdown('Extension not yet activated.');
+      return {};
+    }
+    const bundledSkillRoot = path.join(extensionRoot.fsPath, 'dist', 'bundled-skill');
+
+    let result: SkillResult;
+    try {
+      result = await runAcquireCodebaseKnowledge(
+        workspaceRoot, bundledSkillRoot, model, token,
+        msg => stream.progress(msg),
+      );
+    } catch (err) {
+      if (err instanceof MissingPythonError) {
+        stream.markdown('**`/review` requires Python 3.8+** on your PATH (used by the bundled `acquire-codebase-knowledge` skill). Install Python and try again.');
+      } else if (err instanceof ScanTimeoutError) {
+        stream.markdown('Workspace scan exceeded 60s. Try `/review` again, or run on a smaller subdirectory.');
+      } else if (err instanceof ScanFailedError) {
+        stream.markdown(`scan.py exited with error: ${(err as Error).message}. File a bug if reproducible.`);
+      } else if (err instanceof LmOutputInvalidError) {
+        stream.markdown('The language model returned unparseable STACK.md content. Try `/review` again.');
+      } else {
+        stream.markdown(`/review failed: ${(err as Error).message}`);
+      }
+      return {};
+    }
+
+    if (token.isCancellationRequested) return {};
+
+    const summary = parseStackMd(result.stackMdContent);
+    const staticQs = proposeStaticQueries(summary);
+    const queries = mergeQueries(staticQs, result.lmSuggestedQueries);
+
+    interface Hit { entry: CatalogEntry; score: number; labels: Set<string>; group: QueryGroup; firstQuery: string; }
+    const hits = new Map<string, Hit>();
+    for (const q of queries) {
+      if (token.isCancellationRequested) return {};
+      const rs = searchCatalog(q.query, 'all', 3);
+      for (const r of rs) {
+        const existing = hits.get(r.entry.id);
+        if (!existing) {
+          hits.set(r.entry.id, {
+            entry: r.entry, score: r.score, labels: new Set([q.label]),
+            group: q.group, firstQuery: q.query,
+          });
+        } else {
+          existing.labels.add(q.label);
+          if (r.score > existing.score) {
+            existing.score = r.score;
+            existing.firstQuery = q.query;
+            existing.group = q.group;
+          }
+        }
+      }
+    }
+
+    renderReviewResults(stream, summary, queries, hits, result);
+    return {};
+  }
+
   // Default: search
   const query = request.prompt.trim();
   if (!query) {
@@ -288,6 +388,7 @@ export async function handler(
       `Catalog: **${stats.total} entries** from ${stats.sources.join(', ')}`,
       '',
       '**Search:** `@agent-discovery <query>`',
+      '**Review codebase:** `@agent-discovery /review`',
       '**Install:** `@agent-discovery /install <name>`',
       '**Generate apm.yml:** `@agent-discovery /apm`',
       '',
@@ -315,12 +416,130 @@ export async function handler(
     });
   }
 
+  // Low-result nudge: when a free-form search returns ≤ 1 result AND a workspace is
+  // open, suggest /review which can scan the workspace for tailored recommendations.
+  if (results.length <= 1 && (vscode.workspace.workspaceFolders?.length ?? 0) > 0) {
+    stream.markdown('\n\n> **Tip:** Looking for agents tailored to *this* codebase? Try `@agent-discovery /review`.');
+  }
+
   return {};
+}
+
+// ─── /review rendering ────────────────────────────────────────────────
+
+interface ReviewHit {
+  entry: CatalogEntry;
+  score: number;
+  labels: Set<string>;
+  group: QueryGroup;
+  firstQuery: string;
+}
+
+function renderReviewResults(
+  stream: vscode.ChatResponseStream,
+  summary: ReturnType<typeof parseStackMd>,
+  queries: ProposedQuery[],
+  hits: Map<string, ReviewHit>,
+  result: SkillResult,
+): void {
+  const detected = [...summary.languages, ...summary.frameworks, ...summary.infra, ...summary.ci]
+    .filter(Boolean)
+    .map(t => t.split(/\s+/).map(w => w.charAt(0).toUpperCase() + w.slice(1)).join(' '));
+
+  const lines: string[] = [];
+  lines.push(`✓ Regenerated \`${path.relative(vscode.workspace.workspaceFolders![0].uri.fsPath, result.stackMdPath)}\` (acquire-codebase-knowledge)`);
+  lines.push('');
+  if (detected.length > 0) {
+    lines.push('## Detected stack');
+    lines.push(detected.join(' · '));
+    lines.push('');
+  }
+
+  // Bucket hits by group → label
+  const bucket = (group: QueryGroup) => {
+    const byLabel = new Map<string, ReviewHit[]>();
+    for (const h of hits.values()) {
+      if (h.group !== group) continue;
+      // Use the first label deterministically (Set iteration order = insertion order)
+      const label = h.labels.values().next().value as string;
+      if (!byLabel.has(label)) byLabel.set(label, []);
+      byLabel.get(label)!.push(h);
+    }
+    for (const arr of byLabel.values()) arr.sort((a, b) => b.score - a.score);
+    return byLabel;
+  };
+
+  const techBucket   = bucket('tech');
+  const crossBucket  = bucket('cross-cutting');
+  const adaptBucket  = bucket('stack-adapted');
+
+  const renderCard = (h: ReviewHit) => {
+    const icon = h.entry.type === 'agent' ? '🤖' : h.entry.type === 'skill' ? '⚡' : '📄';
+    lines.push(`- ${icon} **${h.entry.name}** — ${h.entry.description}`);
+    lines.push(`  _via \`${h.firstQuery}\`_ · ${h.entry.type} · ${h.entry.source}`);
+  };
+
+  if (techBucket.size > 0) {
+    lines.push('---');
+    lines.push('## Per-technology recommendations');
+    lines.push('');
+    for (const [label, arr] of techBucket) {
+      if (arr.length === 0) continue;
+      lines.push(`### ${label}`);
+      arr.forEach(renderCard);
+      lines.push('');
+    }
+  }
+
+  if (crossBucket.size > 0) {
+    lines.push('---');
+    lines.push('## Cross-cutting concerns');
+    lines.push('');
+    for (const [label, arr] of crossBucket) {
+      if (arr.length === 0) continue;
+      lines.push(`### ${label}`);
+      arr.forEach(renderCard);
+      lines.push('');
+    }
+  }
+
+  // "Adapted to your stack" only renders if there were LM-suggested queries with hits.
+  const hadLmQueries = queries.some(q => q.group === 'stack-adapted');
+  if (hadLmQueries && adaptBucket.size > 0) {
+    lines.push('---');
+    lines.push('## Adapted to your stack');
+    lines.push('');
+    for (const [label, arr] of adaptBucket) {
+      if (arr.length === 0) continue;
+      const why = queries.find(q => q.label === label && q.group === 'stack-adapted')?.why;
+      lines.push(`### ${label}`);
+      if (why) lines.push(`*Why: ${why} (LM-suggested)*`);
+      arr.forEach(renderCard);
+      lines.push('');
+    }
+  }
+
+  if (hits.size === 0) {
+    lines.push('No catalog matches for the detected stack. Try `@agent-discovery code review` for general recommendations.');
+  } else {
+    lines.push('---');
+    lines.push('**Install any of these:** `@agent-discovery /install <name>`');
+    lines.push('**Lock for your team:** `@agent-discovery /apm`');
+  }
+
+  stream.markdown(lines.join('\n'));
+
+  stream.button({
+    command: 'vscode.open',
+    title: 'Open STACK.md',
+    arguments: [vscode.Uri.file(result.stackMdPath)],
+  });
 }
 
 // ─── Activate ─────────────────────────────────────────────────────────
 
 export function activate(context: vscode.ExtensionContext) {
+  extensionRoot = context.extensionUri;
   const participant = vscode.chat.createChatParticipant(PARTICIPANT_ID, handler);
 
   participant.followupProvider = {
