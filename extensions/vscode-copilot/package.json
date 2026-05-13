@@ -63,8 +63,8 @@
             "description": "Install an agent to your workspace (.claude/agents/, .claude/skills/, or .github/instructions/)"
           },
           {
-            "name": "apm",
-            "description": "Generate an apm.yml manifest for reproducible agent setup across your team"
+            "name": "assemble",
+            "description": "Assemble apm.yml from installed agents + /review's recommendations for reproducible team setup"
           },
           {
             "name": "review",
