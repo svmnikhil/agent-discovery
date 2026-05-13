@@ -137,6 +137,10 @@ export function findByName(name: string): CatalogEntry | undefined {
     ?? ALL_ENTRIES.find(e => e.name.toLowerCase().includes(lower));
 }
 
+export function findById(id: string): CatalogEntry | undefined {
+  return ALL_ENTRIES.find(e => e.id === id);
+}
+
 export function catalogStats() {
   const byType: Record<string, number> = {};
   for (const e of ALL_ENTRIES) {
