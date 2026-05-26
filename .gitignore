@@ -4,3 +4,9 @@ node_modules/
 
 # Don't ignore dist/ - marketplace needs bundled files
 # dist/
+
+# Local env (HTTP MCP server + Kafka REST creds)
+.env
+
+# Streaming-agent proposal artifacts
+proposals/

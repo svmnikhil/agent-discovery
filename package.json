@@ -1,21 +1,24 @@
 {
   "name": "agent-discovery",
   "version": "2.0.0",
-  "description": "MCP server for discovering and installing AI agents from curated catalogs (pre-built SQLite + FTS5)",
+  "description": "MCP server for discovering and installing AI agents from curated catalogs (pre-built SQLite catalog with BM25-style scoring)",
   "type": "module",
   "main": "dist/mcp-server.js",
   "scripts": {
     "build": "tsc",
     "dev": "tsc --watch",
     "build-catalog": "npx tsx scripts/build-catalog.ts",
+    "start:http-mcp": "npx tsx src/mcp-http-server.ts",
     "test:e2e": "npx tsx tests/e2e/runner.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
+    "express": "^5.0.1",
     "sql.js": "^1.14.1",
     "zod": "^3.24.2"
   },
   "devDependencies": {
+    "@types/express": "^5.0.6",
     "@types/node": "^22.0.0",
     "tsx": "^4.21.0",
     "typescript": "^5.7.0"

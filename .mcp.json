@@ -5,5 +5,10 @@
     "env": {
       "CACHE_DIR": "${CLAUDE_PLUGIN_ROOT}/.cache"
     }
+  },
+  "github": {
+    "command": "gh",
+    "args": ["copilot", "mcp-server"],
+    "env": {}
   }
 }

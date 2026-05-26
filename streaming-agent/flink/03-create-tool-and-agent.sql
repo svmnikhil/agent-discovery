@@ -1,0 +1,4 @@
+-- DEPRECATED — Confluent Flink only accepts one statement per submission.
+-- Run these two files separately instead:
+--   03a-create-tool.sql
+--   03b-create-agent.sql
